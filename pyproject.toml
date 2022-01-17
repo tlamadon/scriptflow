@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "scriptflow"
+version = "0.1.0"
+description = "Like a makefile but in python"
+authors = ["Thibaut Lamadon <thibaut.lamadon@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+rich = "^11.0.0"
+toml = "^0.10.2"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
