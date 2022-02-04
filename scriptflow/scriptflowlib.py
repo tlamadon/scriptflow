@@ -9,6 +9,7 @@ import tempfile
 
 from rich.console import Console
 from time import sleep
+from os.path import exists
 
 
 console = Console()
@@ -35,6 +36,7 @@ class Task:
     uid=""
     mem="32Gb"
     ncore="10"
+    retry=0
 
     def __init__(self, cmd):
         self.cmd = cmd
@@ -45,6 +47,10 @@ class Task:
 
     def output(self, output_file):
         self.output_file = output_file    
+        return self     
+
+    def retry(self, retry):
+        self.retry = retry    
         return self     
 
     def input(self, input_file):
@@ -157,11 +163,12 @@ class HpcRunner:
         self.finished = {}
         self.console = Console()
         self.done = 0
+        self.failed = 0
         self.job_params = {'procs':1, 'mem' : "16Gb", 'name':'psub'}
         pass
 
-    def add(self,cmd):
-        self.queue.append(cmd)
+    def add(self,job):
+        self.queue.append(job)
 
     def log(self,str):
         console.log(str)
@@ -191,7 +198,7 @@ class HpcRunner:
                 if (len(self.queue)>0) & (len(self.processes) < self.max_proc):
                     
                     j = self.queue[0]
-                    console.log(f"adding [red]{j.uid}[/red]")
+                    console.log(f"adding [blue]{j.uid}[/blue]")
                     console.log("cmd: {}".format( " ".join(j.get_command() ) ))
 
                     # create the script
@@ -213,7 +220,7 @@ class HpcRunner:
                     
                     self.processes[j.uid] = {"JOB_ID" : JOB_ID, "job": j, "status":"S"}          
                     self.queue.remove(j)
-                    status.update(f"running [green]queued:{len(self.queue)}[/green] [blue]running:{len(self.processes)}[/blue] [purple]done:{self.done}[/purple] ...")
+                    status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] [purple]failed:{self.failed}[/purple] ...")
                     continue
                 
                 # checking job status
@@ -233,14 +240,29 @@ class HpcRunner:
                         continue
 
                     if job_status[p["JOB_ID"]]['status'] == 'C':
-                        console.log("job {} done".format(p["job"].uid))   
+                        console.log("job {} finished".format(p["job"].uid))   
+
+                        # checking that output file exists
+                        if not exists(p["job"].return_file):
+
+                            if  p["job"].retry>0:
+                                console.log("[red]output file missing for {}, retrying... [/red]".format(p["job"].uid))  
+                                p["job"].retry = p["job"].retry -1
+                                self.add(p["job"])
+                            else:
+                                console.log("[red]output file missing for {}, failing! [/red]".format(p["job"].uid))  
+                                self.finished[p["job"].uid] = True
+                                self.failed = self.failed + 1
+
+                        else:
+                            self.finished[p["job"].uid] = True
+                            self.done = self.done +1
+
                         to_remove.append(k)
-                        self.finished[p["job"].uid] = True
-                        self.done = self.done +1
 
                 for k in to_remove:
                     del self.processes[k]                 
-                    status.update(f"running [green]queued:{len(self.queue)}[/green] [blue]running:{len(self.processes)}[/blue] [purple]done:{self.done}[/purple] ...")
+                    status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] [purple]failed:{self.failed}[/purple] ...")
 
                 await asyncio.sleep(2)
 
