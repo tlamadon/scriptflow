@@ -11,7 +11,13 @@ The status is very experimental. I will likely be changing the interface as I go
  - [x] clean terminal feedback (using rich)
  - [x] HPC executor
  - [x] task retry
-
+ - [ ] notifications
+ - [ ] send status to central web service
+ - [ ] resume flows
+ - [ ] named runs
+ - [ ] store run information
+ - [ ] simpler interface with default head executor and awaitable tasks
+ - [ ] load and store tasks results
 
 ## Simple flow example:
 
