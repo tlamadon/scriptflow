@@ -12,11 +12,14 @@ The status is very experimental. I will likely be changing the interface as I go
  - [x] clean terminal feedback (using rich)
  - [x] HPC executor
  - [x] task retry
+ - [x] check that output was generated 
  - [ ] notifications
  - [ ] send status to central web service
  - [ ] resume flows
+ - [ ] clean output
  - [ ] named runs
  - [ ] store run information
+ - [ ] asset diagnostic
  - [ ] simpler interface with default head executor and awaitable tasks
  - [ ] load and store tasks results
 
