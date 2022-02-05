@@ -6,6 +6,7 @@ The status is very experimental. I will likely be changing the interface as I go
 
 ## Goal:
 
+ - [x] works on windows / osx / linux
  - [x] describe dependencies as python code (using await/async)
  - [x] describe scripts with input/output as code
  - [x] clean terminal feedback (using rich)
