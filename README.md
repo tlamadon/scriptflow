@@ -22,6 +22,8 @@ The status is very experimental. I will likely be changing the interface as I go
  - [ ] asset diagnostic
  - [ ] simpler interface with default head executor and awaitable tasks
  - [ ] load and store tasks results
+ - [ ] docker Executor
+ - [ ] aws executor
 
 ## Simple flow example:
 
