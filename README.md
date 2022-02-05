@@ -6,18 +6,24 @@ The status is very experimental. I will likely be changing the interface as I go
 
 ## Goal:
 
+ - [x] works on windows / osx / linux
  - [x] describe dependencies as python code (using await/async)
  - [x] describe scripts with input/output as code
  - [x] clean terminal feedback (using rich)
  - [x] HPC executor
  - [x] task retry
+ - [x] check that output was generated 
  - [ ] notifications
  - [ ] send status to central web service
  - [ ] resume flows
+ - [ ] clean output
  - [ ] named runs
  - [ ] store run information
+ - [ ] asset diagnostic
  - [ ] simpler interface with default head executor and awaitable tasks
  - [ ] load and store tasks results
+ - [ ] docker Executor
+ - [ ] aws executor
 
 ## Simple flow example:
 
