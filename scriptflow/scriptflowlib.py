@@ -113,9 +113,9 @@ class CommandRunner:
                     console.log(f"adding [red]{j.uid}[/red]")
                     console.log("cmd: {}".format( " ".join(j.get_command() ) ))
 
-                    subp = subprocess.Popen(j.get_command(),
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.STDOUT)
+                    subp = subprocess.Popen(j.get_command())
+                        #stdout=subprocess.DEVNULL,
+                        #stderr=subprocess.STDOUT)
 
                     self.processes[j.uid] = {"proc" : subp, "job": j}                
                     self.queue.remove(j)
