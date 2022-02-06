@@ -14,6 +14,7 @@ import asyncio, asyncssh, sys
 import glob
 
 import scriptflow.scriptflowlib as sf
+import requests
 
 from time import sleep
 
@@ -35,23 +36,14 @@ async def main():
     for i in range(5):
         tasks.append( 
             cr.createTask( 
-                sf.Task(["python", "-c", "\"import time; time.sleep(1000); open('test.txt','w').write('hello');\""])
-                    .result(f"res{i}.txt")
+                sf.Task(["python", "-c", "import time; time.sleep(2); open('test_{}.txt','w').write('hello');".format(i)])
+                    .result(f"res_{i}.txt")
                     .uid(f"solve-{i}")
                         )
                     )
 
-    i=10
-    tasks.append( 
-        cr.createTask( 
-            sf.Task("sleep 2; echo {} > res{}.txt".format("hi",i).split(" "))
-                .result(f"res{-1}.txt")
-                .uid(f"solve-{i}")
-                .retry(2)
-                    )
-                )
-
     await asyncio.gather(*tasks)
+    requests.get('http://scriptflow.lamadon.com/test.php?hash=12345&running=10')
 
 @cli.command()
 def all():

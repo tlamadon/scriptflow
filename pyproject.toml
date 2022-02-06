@@ -11,6 +11,7 @@ toml = "^0.10.2"
 click = "^8.0.3"
 numpy = "^1.22.2"
 asyncssh = "^2.9.0"
+requests = "^2.27.1"
 
 [tool.poetry.dev-dependencies]
 
