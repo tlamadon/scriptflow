@@ -21,27 +21,25 @@ from time import sleep
 SERVER_NAME = "acropolis"
 USER_NAME = "lamadon"
 
+# set main maestro
+cr = sf.CommandRunner(3)
+sf.set_main_maestro(cr)
+
 @click.group()
 def cli():
     pass
 
 async def main():
-    cr = sf.CommandRunner(3)
-    cr.log("starting loop")
-    loop = asyncio.create_task(cr.loop())
 
+    asyncio.create_task(sf.get_main_maestro().loop())
     os.makedirs('.sf', exist_ok=True)
 
     tasks = []
     for i in range(5):
-        tasks.append( 
-            cr.createTask( 
-                sf.Task(["python", "-c", "import time; time.sleep(2); open('test_{}.txt','w').write('hello');".format(i)])
-                    .result(f"res_{i}.txt")
-                    .uid(f"solve-{i}")
-                        )
-                    )
-
+        t = sf.Task(["python", "-c", "import time; time.sleep(2); open('test_{}.txt','w').write('hello');".format(i)])
+        t = t.result(f"res_{i}.txt").uid(f"solve-{i}")
+        tasks.append(t)
+            
     await asyncio.gather(*tasks)
     requests.get('http://scriptflow.lamadon.com/test.php?hash=12345&running=10')
 

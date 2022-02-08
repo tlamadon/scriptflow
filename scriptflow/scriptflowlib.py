@@ -39,7 +39,20 @@ class Task:
     retry=0
 
     def __init__(self, cmd):
+        self.fut = asyncio.get_event_loop().create_future()
+        self.running = False
+        self.task = None
         self.cmd = cmd
+
+    def __await__(self):
+        if self.task is None:
+            self.start()
+        return self.fut.__await__()
+
+    def start(self):
+        self.running = True
+        get_main_maestro().add(self)
+        return(self)
 
     def result(self, return_file):
         self.return_file = return_file    
@@ -82,23 +95,6 @@ class CommandRunner:
     def log(self,str):
         console.log(str)
 
-    """
-    returns an awaitable 
-    """
-    def createTask(self,job):
-        self.add(job)
-        return asyncio.create_task(self.createTask_coro(job))
-
-    """
-    this is coroutine that waits for the cmd to be finished
-    """
-    async def createTask_coro(self,job): 
-        while True:
-            await asyncio.sleep(1)
-            if job.uid in self.finished.keys():
-                del self.finished[job.uid]
-                break
-
 
     async def loop(self):
 
@@ -126,20 +122,15 @@ class CommandRunner:
                     poll_val = p["proc"].poll()
                     if poll_val is not None:
                         console.log("job {} done r={}".format(p["job"].uid, poll_val))   
+                        
                         to_remove.append(k)
                         self.finished[p["job"].uid] = True
                         self.done = self.done +1
+                        p["job"].fut.set_result(p["job"])
 
                 for k in to_remove:
                     del self.processes[k]                 
                     status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] ...")
-
-                # self.processes.difference_update([
-                #     p for p in self.processes.values() if p["proc"].poll() is not None])
-
-                # # we stop the loop if all processes are done and queue is empty
-                # if (len(self.processes)==0):
-                #     break
 
 class HpcRunner:
 
@@ -281,3 +272,14 @@ class HpcRunner:
 #     await asyncio.gather(t1,t2)
 
 # asyncio.run(main())
+
+
+# creating the main executor!
+maestro = None
+
+def set_main_maestro(cr):
+    global maestro
+    maestro = cr
+
+def get_main_maestro():
+    return maestro
