@@ -73,8 +73,19 @@ class Task:
         self.input_file = input_file  
         return self  
 
-    def add_deps(self, dep):
-        self.deps.append(dep)
+    def add_deps(self, deps):
+
+        if isinstance(deps, str):
+            self.deps.append(deps)
+            return(self)
+
+        if not hasattr(deps, "__iter__"): #returns True if type of iterable - same problem with strings
+            deps = list(deps)
+        
+        for dep in deps:
+            self.deps.append(dep)
+
+        return(self)
 
     def uid(self,uid):
         self.uid = uid
@@ -115,13 +126,13 @@ class CommandRunner:
                     # checking if the task needs to be redone
                     # to be done   
                     if os.path.exists(j.output_file):
-                        console.log("checking up to date {}".format(j.output_file))
+                        console.log("checking {}".format(j.output_file))
                         output_time = os.path.getmtime(j.output_file)  
+
                         UP_TO_DATE = True
                         for f in j.deps:
-                            if os.path.getmtime(f) > output_time:
-                                console.log("not up to date")
-    
+                            console.log("checking {}".format(f))
+                            if os.path.getmtime(f) > output_time:    
                                 UP_TO_DATE = False
                                 break 
                         
