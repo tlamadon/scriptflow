@@ -45,6 +45,9 @@ async def main():
     t = Task("2").start()
     await t
 
+    # await it again...
+    await t
+
     # create 2 tasks, await them 
     t1 = Task("3.1")
     t2 = Task("3.2")

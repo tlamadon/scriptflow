@@ -37,10 +37,17 @@ async def main():
     tasks = []
     for i in range(5):
         t = sf.Task(["python", "-c", "import time; time.sleep(2); open('test_{}.txt','w').write('hello');".format(i)])
-        t = t.result(f"res_{i}.txt").uid(f"solve-{i}")
+        t = t.output(f"test_{i}.txt").uid(f"solve-{i}")
         tasks.append(t)
-            
+
     await asyncio.gather(*tasks)
+
+    i = 10
+    t = sf.Task(["python", "-c", "import time; time.sleep(2); open('test_{}.txt','w').write('hello');".format(i)])
+    t.output(f"test_{i}.txt").uid(f"solve-{i}").add_deps("test_1.txt")
+
+    await t
+
     requests.get('http://scriptflow.lamadon.com/test.php?hash=12345&running=10')
 
 @cli.command()

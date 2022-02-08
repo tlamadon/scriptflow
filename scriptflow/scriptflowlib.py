@@ -43,6 +43,8 @@ class Task:
         self.running = False
         self.task = None
         self.cmd = cmd
+        self.deps = []
+        self.output_file = ""
 
     def __await__(self):
         if self.task is None:
@@ -71,6 +73,9 @@ class Task:
         self.input_file = input_file  
         return self  
 
+    def add_deps(self, dep):
+        self.deps.append(dep)
+
     def uid(self,uid):
         self.uid = uid
         return self
@@ -87,6 +92,7 @@ class CommandRunner:
         self.finished = {}
         self.console = Console()
         self.done = 0
+        self.history = {}
         pass
 
     def add(self,cmd):
@@ -94,7 +100,6 @@ class CommandRunner:
 
     def log(self,str):
         console.log(str)
-
 
     async def loop(self):
 
@@ -106,6 +111,26 @@ class CommandRunner:
                 if (len(self.queue)>0) & (len(self.processes) < self.max_proc):
                     
                     j = self.queue[0]
+
+                    # checking if the task needs to be redone
+                    # to be done   
+                    if os.path.exists(j.output_file):
+                        console.log("checking up to date {}".format(j.output_file))
+                        output_time = os.path.getmtime(j.output_file)  
+                        UP_TO_DATE = True
+                        for f in j.deps:
+                            if os.path.getmtime(f) > output_time:
+                                console.log("not up to date")
+    
+                                UP_TO_DATE = False
+                                break 
+                        
+                        if UP_TO_DATE:
+                            console.log(f"up to date, skipping [red]{j.uid}[/red]")
+                            self.queue.remove(j)
+                            j.fut.set_result(j)
+                            continue                                                     
+
                     console.log(f"adding [red]{j.uid}[/red]")
                     console.log("cmd: {}".format( " ".join(j.get_command() ) ))
 
@@ -127,6 +152,12 @@ class CommandRunner:
                         self.finished[p["job"].uid] = True
                         self.done = self.done +1
                         p["job"].fut.set_result(p["job"])
+
+                        # append job to history 
+                        self.history[p["job"].uid] = {
+                            'deps' : p["job"].deps,
+                            'output' : p["job"].output_file,
+                        }
 
                 for k in to_remove:
                     del self.processes[k]                 
