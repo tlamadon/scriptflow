@@ -29,10 +29,7 @@ sf.set_main_maestro(cr)
 def cli():
     pass
 
-async def main():
-
-    asyncio.create_task(sf.get_main_maestro().loop())
-    os.makedirs('.sf', exist_ok=True)
+async def flow_sleepit():
 
     tasks = []
     for i in range(5):
@@ -50,9 +47,36 @@ async def main():
 
     requests.get('http://scriptflow.lamadon.com/test.php?hash=12345&running=10')
 
+
+"""
+======================== SCRIPTFLOW INTERNALS ==========================
+"""
+
+"""
+    Main
+"""
+async def main(func):
+
+    asyncio.create_task(sf.get_main_maestro().loop())
+    os.makedirs('.sf', exist_ok=True)
+
+    await func()      
+    # await asyncio.gather(cf_vdec_growth(), cf_vdec_level())
+    # requests.get('http://scriptflow.lamadon.com/test.php?hash=12345&running=10')
+
 @cli.command()
-def all():
-    asyncio.run(main())
+@click.argument('name')
+def run(name=""):
+
+    func_names = globals().keys()
+    flows = [w.replace("flow_","") for w in func_names if w.startswith("flow_")]
+
+    if name not in flows:
+        print("Flow {} is not available, values ares: {}".format(name, ", ".join(flows)))
+        return()
+
+    func = globals()["flow_{}".format(name)]
+    asyncio.run(main(func))
 
 if __name__ == '__main__':
     cli()

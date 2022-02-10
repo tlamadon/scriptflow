@@ -45,6 +45,7 @@ class Task:
         self.cmd = cmd
         self.deps = []
         self.output_file = ""
+        self.quiet = True
 
     def __await__(self):
         if self.task is None:
@@ -122,35 +123,42 @@ class CommandRunner:
                 if (len(self.queue)>0) & (len(self.processes) < self.max_proc):
                     
                     j = self.queue[0]
+                    self.queue.remove(j)
 
                     # checking if the task needs to be redone
                     # to be done   
                     if os.path.exists(j.output_file):
-                        console.log("checking {}".format(j.output_file))
+                        # console.log("checking {}".format(j.output_file))
                         output_time = os.path.getmtime(j.output_file)  
 
                         UP_TO_DATE = True
                         for f in j.deps:
-                            console.log("checking {}".format(f))
                             if os.path.getmtime(f) > output_time:    
+                                console.log("{} input {} more recent than output".format(j.uid, f))
                                 UP_TO_DATE = False
                                 break 
                         
                         if UP_TO_DATE:
                             console.log(f"up to date, skipping [red]{j.uid}[/red]")
-                            self.queue.remove(j)
+                            #self.queue.remove(j)
                             j.fut.set_result(j)
                             continue                                                     
 
                     console.log(f"adding [red]{j.uid}[/red]")
                     console.log("cmd: {}".format( " ".join(j.get_command() ) ))
 
-                    subp = subprocess.Popen(j.get_command())
-                        #stdout=subprocess.DEVNULL,
-                        #stderr=subprocess.STDOUT)
+                    if j.quiet:
+                        subp = subprocess.Popen(j.get_command(),
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.STDOUT)
+                    else:
+                        subp = subprocess.Popen(j.get_command())
+                            #stdout=subprocess.DEVNULL,
+                            #stderr=subprocess.STDOUT)
+
 
                     self.processes[j.uid] = {"proc" : subp, "job": j}                
-                    self.queue.remove(j)
+                    #self.queue.remove(j)
                     status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] ...")
                 
                 to_remove = []
