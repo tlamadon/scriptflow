@@ -8,7 +8,6 @@ import toml
 import asyncio
 import json
 import click
-import numpy as np
 
 import asyncio, asyncssh, sys
 import glob
@@ -20,36 +19,30 @@ from time import sleep
 SERVER_NAME = "acropolis"
 USER_NAME = "lamadon"
 
+# set main maestro
+cr = sf.HpcRunner(3)
+sf.set_main_maestro(cr)
+
 @click.group()
 def cli():
     pass
 
 async def main():
-    cr = sf.HpcRunner(3)    
-    cr.log("starting loop")
-    loop = asyncio.create_task(cr.loop())
-
+    asyncio.create_task(sf.get_main_maestro().loop())
     os.makedirs('.sf', exist_ok=True)
 
-    tasks = []
-    for i in range(5):
-        tasks.append( 
-            cr.createTask( 
-                sf.Task("sleep 2; echo {} > res{}.txt".format("hi",i).split(" "))
-                    .result(f"res{i}.txt")
-                    .uid(f"solve-{i}")
-                        )
-                    )
+    tasks = [
+        sf.Task("sleep 2; echo {} > res{}.txt".format("hi",i).split(" "))
+            .result(f"res{i}.txt")
+            .uid(f"solve-{i}")                    
+        for i in range(5) ]
 
     i=10
     tasks.append( 
-        cr.createTask( 
-            sf.Task("sleep 2; echo {} > res{}.txt".format("hi",i).split(" "))
-                .result(f"res{-1}.txt")
-                .uid(f"solve-{i}")
-                .retry(2)
-                    )
-                )
+        sf.Task("sleep 2; echo {} > res{}.txt".format("hi",i).split(" "))
+            .result(f"res{-1}.txt")
+            .uid(f"solve-{i}")
+            .retry(2))
 
     await asyncio.gather(*tasks)
 

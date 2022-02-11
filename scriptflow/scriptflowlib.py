@@ -214,23 +214,6 @@ class HpcRunner:
     def log(self,str):
         console.log(str)
 
-    """
-    returns an awaitable 
-    """
-    def createTask(self,job):
-        self.add(job)
-        return asyncio.create_task(self.createTask_coro(job))
-
-    """
-    this is coroutine that waits for the cmd to be finished
-    """
-    async def createTask_coro(self,job): 
-        while True:
-            await asyncio.sleep(1)
-            if job.uid in self.finished.keys():
-                del self.finished[job.uid]
-                break
-
     async def loop(self):
         with console.status("Running ...") as status:
             while True:
@@ -256,12 +239,19 @@ class HpcRunner:
                     tmp.close()
 
                     command = ["qsub", tmp_script_filename]
-                    output = subprocess.check_output(command).decode()
-                    JOB_ID = output.replace("\n","")
-                    
-                    self.processes[j.uid] = {"JOB_ID" : JOB_ID, "job": j, "status":"S"}          
-                    self.queue.remove(j)
-                    status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] [purple]failed:{self.failed}[/purple] ...")
+                    try:
+                        output = subprocess.check_output(command).decode()
+                        JOB_ID = output.replace("\n","")
+                        
+                        self.processes[j.uid] = {"JOB_ID" : JOB_ID, "job": j, "status":"S"}          
+                        self.queue.remove(j)
+                        status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] [purple]failed:{self.failed}[/purple] ...")
+
+                    except subprocess.CalledProcessError as e:
+                        console.log("issue with qsub, giving it a short break...")
+                        status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] [purple]failed:{self.failed}[/purple] ...")
+                        await asyncio.sleep(2)
+
                     continue
                 
                 # checking job status
@@ -294,10 +284,12 @@ class HpcRunner:
                                 console.log("[red]output file missing for {}, failing! [/red]".format(p["job"].uid))  
                                 self.finished[p["job"].uid] = True
                                 self.failed = self.failed + 1
+                                p["job"].fut.set_result(p["job"])
 
                         else:
                             self.finished[p["job"].uid] = True
                             self.done = self.done +1
+                            p["job"].fut.set_result(p["job"])
 
                         to_remove.append(k)
 
