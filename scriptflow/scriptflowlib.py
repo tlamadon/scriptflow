@@ -238,7 +238,7 @@ class HpcRunner:
                         
                         if UP_TO_DATE:
                             console.log(f"up to date, skipping [red]{j.uid}[/red]")
-                            #self.queue.remove(j)
+                            self.queue.remove(j)
                             j.fut.set_result(j)
                             continue       
 
