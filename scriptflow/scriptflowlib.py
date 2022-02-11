@@ -222,6 +222,26 @@ class HpcRunner:
                 if (len(self.queue)>0) & (len(self.processes) < self.max_proc):
                     
                     j = self.queue[0]
+
+                    # checking if the task needs to be redone
+                    # to be done   
+                    if os.path.exists(j.output_file):
+                        # console.log("checking {}".format(j.output_file))
+                        output_time = os.path.getmtime(j.output_file)  
+
+                        UP_TO_DATE = True
+                        for f in j.deps:
+                            if os.path.getmtime(f) > output_time:    
+                                console.log("{} input {} more recent than output".format(j.uid, f))
+                                UP_TO_DATE = False
+                                break 
+                        
+                        if UP_TO_DATE:
+                            console.log(f"up to date, skipping [red]{j.uid}[/red]")
+                            #self.queue.remove(j)
+                            j.fut.set_result(j)
+                            continue       
+
                     console.log(f"adding [blue]{j.uid}[/blue]")
                     console.log("cmd: {}".format( " ".join(j.get_command() ) ))
 

@@ -33,7 +33,7 @@ async def main():
 
     tasks = [
         sf.Task("sleep 2; echo {} > res{}.txt".format("hi",i).split(" "))
-            .result(f"res{i}.txt")
+            .output(f"res{i}.txt").result(f"res{i}.txt")
             .uid(f"solve-{i}")                    
         for i in range(5) ]
 
