@@ -14,16 +14,19 @@ The status is very experimental. I will likely be changing the interface as I go
  - [x] task retry
  - [x] check that output was generated 
  - [ ] notifications
- - [ ] send status to central web service
- - [ ] resume flows
+ - [x] send status to central web service
+ - [x] resume flows
  - [ ] clean output
  - [ ] named runs
  - [ ] store run information
  - [ ] asset diagnostic
- - [ ] simpler interface with default head executor and awaitable tasks
+ - [x] simpler interface with default head executor and awaitable tasks
  - [ ] load and store tasks results
  - [ ] docker Executor
  - [ ] aws executor
+ - [ ] cache flows in addition to caching tasks (avoid same task getting scheduled from 2 places)
+ - [x] add check on qsub return value
+ - [x] select flow by name from terminal 
 
 ## Simple flow example:
 
