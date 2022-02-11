@@ -21,6 +21,7 @@ The status is very experimental. I will likely be changing the interface as I go
  - [ ] store run information
  - [ ] asset diagnostic
  - [x] simpler interface with default head executor and awaitable tasks
+ - [x] skip computation best on timestamp of inputs and outpus
  - [ ] load and store tasks results
  - [ ] docker Executor
  - [ ] aws executor
