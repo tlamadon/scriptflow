@@ -34,9 +34,10 @@ The status is very experimental. I will likely be changing the interface as I go
 
 ## Simple flow example:
 
-from scriptflow import Task
 
 ```python
+from scriptflow import Task
+
 async def flow_sleepit():
 
     # create tasks
