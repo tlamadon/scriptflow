@@ -31,6 +31,7 @@ The status is very experimental. I will likely be changing the interface as I go
  - [ ] cache flows in addition to caching tasks (avoid same task getting scheduled from 2 places)
  - [x] add check on qsub return values
  - [x] select flow by name from terminal 
+ - [ ] allow for glob output/input
 
 ## Simple flow example:
 
