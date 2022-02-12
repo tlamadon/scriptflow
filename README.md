@@ -34,19 +34,19 @@ The status is very experimental. I will likely be changing the interface as I go
 
 ## Simple flow example:
 
-```python
-async def main():
-    cr = sf.HpcRunner(3)    
-    cr.log("starting loop")
-    loop = asyncio.create_task(cr.loop())
+from scriptflow import Task
 
-    tasks = []
-    for i in range(5):
-        t =  cr.createTask( sf.Task("sleep 2; echo {} > res{}.txt".format("hi",i).split(" "))
+```python
+async def flow_sleepit():
+
+    # create tasks
+    tasks = [
+      Task("sleep 2; echo {} > res{}.txt".format("hi",i).split(" "))
                     .result(f"res{i}.txt")
                     .uid(f"solve-{i}")))
-        tasks.append(t)
-        
+      for i in range(5)]
+      
+    # await then in parelell
     await asyncio.gather(*tasks)
 ```                    
 
