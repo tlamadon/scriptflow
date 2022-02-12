@@ -4,13 +4,12 @@ Small library that allows scheduling scripts asyncrhonously on different platfor
 
 The status is very experimental. I will likely be changing the interface as I go. 
 
-## Goal:
+## Goals:
 
  - [x] works on windows / osx / linux
  - [x] describe dependencies as python code (using await/async)
  - [x] describe scripts with input/output as code
  - [x] clean terminal feedback (using rich)
- - [x] HPC executor
  - [x] task retry
  - [x] check that output was generated 
  - [ ] notifications
@@ -19,14 +18,18 @@ The status is very experimental. I will likely be changing the interface as I go
  - [ ] clean output
  - [ ] named runs
  - [ ] store run information
- - [ ] asset diagnostic
+ - [ ] output diagnostic / reporting (tracing how files were created)
  - [x] simpler interface with default head executor and awaitable tasks
  - [x] skip computation best on timestamp of inputs and outpus
  - [ ] load and store tasks results
- - [ ] docker Executor
- - [ ] aws executor
+ - executors :
+   - [x] local excutor using subprocess 
+   - [x] HPC excutor (monitoring qsub) 
+   - [ ] docker Executor 
+   - [ ] aws executor (probably using Ray)
+   - [ ] dask executor  
  - [ ] cache flows in addition to caching tasks (avoid same task getting scheduled from 2 places)
- - [x] add check on qsub return value
+ - [x] add check on qsub return values
  - [x] select flow by name from terminal 
 
 ## Simple flow example:
