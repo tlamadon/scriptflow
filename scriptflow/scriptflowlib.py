@@ -221,23 +221,6 @@ class HpcRunner:
     def log(self,str):
         console.log(str)
 
-    """
-    returns an awaitable 
-    """
-    def createTask(self,job):
-        self.add(job)
-        return asyncio.create_task(self.createTask_coro(job))
-
-    """
-    this is coroutine that waits for the cmd to be finished
-    """
-    async def createTask_coro(self,job): 
-        while True:
-            await asyncio.sleep(1)
-            if job.uid in self.finished.keys():
-                del self.finished[job.uid]
-                break
-
     async def loop(self):
         with console.status("Running ...") as status:
             while True:
@@ -246,6 +229,26 @@ class HpcRunner:
                 if (len(self.queue)>0) & (len(self.processes) < self.max_proc):
                     
                     j = self.queue[0]
+
+                    # checking if the task needs to be redone
+                    # to be done   
+                    if os.path.exists(j.output_file):
+                        # console.log("checking {}".format(j.output_file))
+                        output_time = os.path.getmtime(j.output_file)  
+
+                        UP_TO_DATE = True
+                        for f in j.deps:
+                            if os.path.getmtime(f) > output_time:    
+                                console.log("{} input {} more recent than output".format(j.uid, f))
+                                UP_TO_DATE = False
+                                break 
+                        
+                        if UP_TO_DATE:
+                            console.log(f"up to date, skipping [red]{j.uid}[/red]")
+                            self.queue.remove(j)
+                            j.fut.set_result(j)
+                            continue       
+
                     console.log(f"adding [blue]{j.uid}[/blue]")
                     console.log("cmd: {}".format( " ".join(j.get_command() ) ))
 
@@ -263,12 +266,19 @@ class HpcRunner:
                     tmp.close()
 
                     command = ["qsub", tmp_script_filename]
-                    output = subprocess.check_output(command).decode()
-                    JOB_ID = output.replace("\n","")
-                    
-                    self.processes[j.uid] = {"JOB_ID" : JOB_ID, "job": j, "status":"S"}          
-                    self.queue.remove(j)
-                    status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] [purple]failed:{self.failed}[/purple] ...")
+                    try:
+                        output = subprocess.check_output(command).decode()
+                        JOB_ID = output.replace("\n","")
+                        
+                        self.processes[j.uid] = {"JOB_ID" : JOB_ID, "job": j, "status":"S"}          
+                        self.queue.remove(j)
+                        status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] [purple]failed:{self.failed}[/purple] ...")
+
+                    except subprocess.CalledProcessError as e:
+                        console.log("issue with qsub, giving it a short break...")
+                        status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] [purple]failed:{self.failed}[/purple] ...")
+                        await asyncio.sleep(2)
+
                     continue
                 
                 # checking job status
@@ -301,10 +311,12 @@ class HpcRunner:
                                 console.log("[red]output file missing for {}, failing! [/red]".format(p["job"].uid))  
                                 self.finished[p["job"].uid] = True
                                 self.failed = self.failed + 1
+                                p["job"].fut.set_result(p["job"])
 
                         else:
                             self.finished[p["job"].uid] = True
                             self.done = self.done +1
+                            p["job"].fut.set_result(p["job"])
 
                         to_remove.append(k)
 

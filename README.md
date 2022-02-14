@@ -4,42 +4,52 @@ Small library that allows scheduling scripts asyncrhonously on different platfor
 
 The status is very experimental. I will likely be changing the interface as I go. 
 
-## Goal:
+## Goals:
 
  - [x] works on windows / osx / linux
  - [x] describe dependencies as python code (using await/async)
  - [x] describe scripts with input/output as code
  - [x] clean terminal feedback (using rich)
- - [x] HPC executor
  - [x] task retry
  - [x] check that output was generated 
  - [ ] notifications
- - [ ] send status to central web service
- - [ ] resume flows
+ - [x] send status to central web service
+ - [x] resume flows
  - [ ] clean output
  - [ ] named runs
  - [ ] store run information
- - [ ] asset diagnostic
- - [ ] simpler interface with default head executor and awaitable tasks
+ - [ ] output diagnostic / reporting (tracing how files were created)
+ - [x] simpler interface with default head executor and awaitable tasks
+ - [x] skip computation best on timestamp of inputs and outpus
  - [ ] load and store tasks results
- - [ ] docker Executor
- - [ ] aws executor
+ - executors :
+   - [x] local excutor using subprocess 
+   - [x] HPC excutor (monitoring qsub) 
+   - [ ] docker Executor 
+   - [ ] aws executor (probably using Ray)
+   - [ ] dask executor  
+ - [ ] cache flows in addition to caching tasks (avoid same task getting scheduled from 2 places)
+ - [x] add check on qsub return values
+ - [x] select flow by name from terminal 
+ - [ ] allow for glob output/input
+ - [ ] ? scripts can create tasks, not sure how to await them. 
 
 ## Simple flow example:
 
-```python
-async def main():
-    cr = sf.HpcRunner(3)    
-    cr.log("starting loop")
-    loop = asyncio.create_task(cr.loop())
 
-    tasks = []
-    for i in range(5):
-        t =  cr.createTask( sf.Task("sleep 2; echo {} > res{}.txt".format("hi",i).split(" "))
+```python
+from scriptflow import Task
+
+async def flow_sleepit():
+
+    # create tasks
+    tasks = [
+      Task("sleep 2; echo {} > res{}.txt".format("hi",i).split(" "))
                     .result(f"res{i}.txt")
                     .uid(f"solve-{i}")))
-        tasks.append(t)
-        
+      for i in range(5)]
+      
+    # await then in parelell
     await asyncio.gather(*tasks)
 ```                    
 
