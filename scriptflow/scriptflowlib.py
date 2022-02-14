@@ -31,6 +31,13 @@ console = Console()
 from rich.console import Console
 from time import sleep
 
+"""
+
+note: 
+ - use input and output for dependencies and generated stuff
+ - use set_args and set_return for input parameters and return values that should be collected
+
+"""
 class Task:
     cmd =""
     uid=""
