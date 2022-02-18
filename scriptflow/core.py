@@ -27,6 +27,9 @@ console = Console()
 
 # ["python", "-c", "import time; time.sleep(3); print('done')"]
 
+def bag(*args, **kwargs):
+    return(asyncio.gather(*args, **kwargs))
+
 
 from rich.console import Console
 from time import sleep

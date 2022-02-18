@@ -13,7 +13,7 @@ import numpy as np
 import asyncio, asyncssh, sys
 import glob
 
-import scriptflow.scriptflowlib as sf
+import scriptflow.core as sf
 import requests
 
 from time import sleep
