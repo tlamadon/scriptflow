@@ -1,8 +1,6 @@
 #!/usr/bin/python3
 
-import asyncio
 import scriptflow as sf
-import random
 
 # set main maestro
 cr = sf.CommandRunner(3)
