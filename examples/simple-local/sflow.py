@@ -1,4 +1,10 @@
-#!/usr/bin/python3
+"""
+Simple example with dependencis. Install scriptflow with pip install scriptflow then run 
+
+> scriptflow run sleepit
+
+"""
+
 
 import scriptflow as sf
 
