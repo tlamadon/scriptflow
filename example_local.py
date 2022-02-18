@@ -25,10 +25,6 @@ USER_NAME = "lamadon"
 cr = sf.CommandRunner(3)
 sf.set_main_maestro(cr)
 
-@click.group()
-def cli():
-    pass
-
 async def flow_sleepit():
 
     tasks = []
@@ -41,7 +37,7 @@ async def flow_sleepit():
 
     i = 10
     t = sf.Task(["python", "-c", "import time; time.sleep(2); open('test_{}.txt','w').write('hello');".format(i)])
-    t.output(f"test_{i}.txt").uid(f"solve-{i}").add_deps("test_1.txt")
+    t.output(f"test_{i}.txt").uid(f"solve-{i}").add_deps(["test_1.txt","test_2.txt"])
 
     await t
 
@@ -63,6 +59,10 @@ async def main(func):
     await func()      
     # await asyncio.gather(cf_vdec_growth(), cf_vdec_level())
     # requests.get('http://scriptflow.lamadon.com/test.php?hash=12345&running=10')
+
+@click.group()
+def cli():
+    pass
 
 @cli.command()
 @click.argument('name')
