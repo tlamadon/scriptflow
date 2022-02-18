@@ -124,7 +124,6 @@ class CommandRunner:
 
         with console.status("Running ...") as status:
             while True:
-                await asyncio.sleep(0.1)
 
                 # check if we can add a new process
                 if (len(self.queue)>0) & (len(self.processes) < self.max_proc):
@@ -188,6 +187,8 @@ class CommandRunner:
                 for k in to_remove:
                     del self.processes[k]                 
                     status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] ...")
+
+                await asyncio.sleep(0.1)
 
 class HpcRunner:
 
