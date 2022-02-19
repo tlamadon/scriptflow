@@ -33,6 +33,10 @@ The status is very experimental. I will likely be changing the interface as I go
  - [x] select flow by name from terminal 
  - [ ] allow for glob output/input
  - [ ] ? scripts can create tasks, not sure how to await them. 
+ - reporting:
+   - [ ] input and output hashes
+   - [ ] start and end datetimes
+
 
 ## Simple flow example:
 
