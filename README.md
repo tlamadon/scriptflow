@@ -87,8 +87,8 @@ scritpflow run sleepit
 ## Life cycle of a task
 
 1. the task object is created. All properties can be edited.
-2. the task is sent to an executor. At this point, the properties of the task are frozen. They can be read, copied but not changed. A unique ID id created from the task from its command and its inputs.
-3. the task is awaited, and hence execution is blocked until the task is finished. Nothing can be done at that stage. (Note that the task is automatically sent at this stage if it has not be done before).
+2. the task is sent to an executor. At this point, the properties of the task are frozen. They can be read, copied but not changed. A unique ID id created from the task from its command and its inputs. The task can be sent by using the `start()` method, or it will be sent automatically when awaited.
+3. the task is awaited, and hence execution is blocked until the task is finished. Nothing can be done at that stage. Again, the task is automatically sent at this stage if it has not be done before. Also note that several tasks can be awaited in parallel by bagging them with `sf.bag(...)`.
 4. the task is completed, the await returns. The task has now it's output attached to it, it can be used in the creation of other tasks.
 
 ## Inspiration / Alternatives
