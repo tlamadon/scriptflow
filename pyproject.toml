@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "scriptflow"
-version = "0.1.0"
+version = "0.1.1"
 description = "Like a makefile but in python, a stripped-down system of Airflow or Luigi"
 authors = ["Thibaut Lamadon <thibaut.lamadon@gmail.com>"]
 
@@ -16,7 +16,7 @@ requests = "^2.27.1"
 [tool.poetry.dev-dependencies]
 
 [tool.poetry.scripts]
-scriptflow = 'scriptflow.scriptflow_cli:hello'
+scriptflow = 'scriptflow.cli:cli'
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
