@@ -8,7 +8,7 @@ from inspect import getmembers, isfunction
 import scriptflow.core as sf
 import os
 
-spec = importlib.util.spec_from_file_location("", "/home/tlamadon/git/scriptflow/examples/simple-local/sflow.py")
+spec = importlib.util.spec_from_file_location("", os.getcwd() + "/sflow.py")
 foo = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(foo)
 

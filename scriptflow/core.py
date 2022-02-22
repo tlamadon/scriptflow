@@ -6,11 +6,12 @@ import time
 #import toml
 import asyncio
 import tempfile
+from datetime import datetime
 
 from rich.console import Console
 from time import sleep
 from os.path import exists
-
+from tinydb import TinyDB, Query
 
 console = Console()
 
@@ -114,7 +115,7 @@ class CommandRunner:
         self.finished = {}
         self.console = Console()
         self.done = 0
-        self.history = {}
+        self.history = TinyDB('sf.json')
         pass
 
     def add(self,cmd):
@@ -156,6 +157,7 @@ class CommandRunner:
                     console.log(f"adding [red]{j.uid}[/red]")
                     console.log("cmd: {}".format( " ".join(j.get_command() ) ))
 
+
                     if j.quiet:
                         subp = subprocess.Popen(j.get_command(),
                             stdout=subprocess.DEVNULL,
@@ -166,7 +168,7 @@ class CommandRunner:
                             #stderr=subprocess.STDOUT)
 
 
-                    self.processes[j.uid] = {"proc" : subp, "job": j}                
+                    self.processes[j.uid] = {"proc" : subp, "job": j , 'start_time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")}                
                     #self.queue.remove(j)
                     status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] ...")
                 
@@ -182,10 +184,24 @@ class CommandRunner:
                         p["job"].fut.set_result(p["job"])
 
                         # append job to history 
-                        self.history[p["job"].uid] = {
-                            'deps' : p["job"].deps,
-                            'output' : p["job"].output_file,
-                        }
+                        tj = Query()
+                        if len(self.history.search(tj.uid ==  p["job"].uid))>0:
+                            self.history.update({
+                                'deps' : p["job"].deps,
+                                'output' : p["job"].output_file,
+                                'cmd':p["job"].get_command(),
+                                'start_time':p['start_time'],
+                                'end_time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                            },tj.uid ==  p["job"].uid)
+                        else:
+                            self.history.insert({
+                                'uid': p["job"].uid, 
+                                'deps' : p["job"].deps,
+                                'output' : p["job"].output_file,
+                                'cmd':p["job"].get_command(),
+                                'start_time':p['start_time'],
+                                'end_time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                            })
 
                 for k in to_remove:
                     del self.processes[k]                 
