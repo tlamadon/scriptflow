@@ -12,6 +12,7 @@ from rich.console import Console
 from time import sleep
 from os.path import exists
 from tinydb import TinyDB, Query
+import hashlib
 
 console = Console()
 
@@ -57,6 +58,7 @@ class Task:
         self.deps = []
         self.output_file = ""
         self.quiet = True
+        self.hash = ""
 
     def __await__(self):
         if self.task is None:
@@ -65,6 +67,8 @@ class Task:
 
     def start(self):
         self.running = True
+        self.hash = hashlib.md5("".join(self.get_command()).encode()).hexdigest()
+
         get_main_maestro().add(self)
         return(self)
 
@@ -98,6 +102,9 @@ class Task:
             self.deps.append(dep)
 
         return(self)
+
+    def name(self,name):
+        self.name = name
 
     def uid(self,uid):
         self.uid = uid
@@ -168,7 +175,7 @@ class CommandRunner:
                             #stderr=subprocess.STDOUT)
 
 
-                    self.processes[j.uid] = {"proc" : subp, "job": j , 'start_time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")}                
+                    self.processes[j.hash] = {"proc" : subp, "job": j , 'start_time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")}                
                     #self.queue.remove(j)
                     status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] ...")
                 
@@ -179,23 +186,23 @@ class CommandRunner:
                         console.log("job {} done r={}".format(p["job"].uid, poll_val))   
                         
                         to_remove.append(k)
-                        self.finished[p["job"].uid] = True
+                        self.finished[p["job"].hash] = True
                         self.done = self.done +1
                         p["job"].fut.set_result(p["job"])
 
                         # append job to history 
                         tj = Query()
-                        if len(self.history.search(tj.uid ==  p["job"].uid))>0:
+                        if len(self.history.search(tj.hash ==  p["job"].hash))>0:
                             self.history.update({
                                 'deps' : p["job"].deps,
                                 'output' : p["job"].output_file,
                                 'cmd':p["job"].get_command(),
                                 'start_time':p['start_time'],
                                 'end_time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                            },tj.uid ==  p["job"].uid)
+                            },tj.hash ==  p["job"].hash)
                         else:
                             self.history.insert({
-                                'uid': p["job"].uid, 
+                                'hash': p["job"].hash, 
                                 'deps' : p["job"].deps,
                                 'output' : p["job"].output_file,
                                 'cmd':p["job"].get_command(),
@@ -290,7 +297,7 @@ class HpcRunner:
                         output = subprocess.check_output(command).decode()
                         JOB_ID = output.replace("\n","")
                         
-                        self.processes[j.uid] = {"JOB_ID" : JOB_ID, "job": j, "status":"S"}          
+                        self.processes[j.hash] = {"JOB_ID" : JOB_ID, "job": j, "status":"S"}          
                         self.queue.remove(j)
                         status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] [purple]failed:{self.failed}[/purple] ...")
 
