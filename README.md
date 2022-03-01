@@ -20,7 +20,7 @@ The status is very experimental. I will likely be changing the interface as I go
  - [ ] store run information
  - [ ] output diagnostic / reporting (tracing how files were created)
  - [x] simpler interface with default head executor and awaitable tasks
- - [x] skip computation best on timestamp of inputs and outpus
+ - [x] skip computation based on timestamp of inputs and outpus
  - [ ] load and store tasks results
  - executors :
    - [x] local excutor using subprocess 
