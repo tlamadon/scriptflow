@@ -12,7 +12,7 @@ import click
 import asyncio, asyncssh, sys
 import glob
 
-import scriptflow.scriptflowlib as sf
+import scriptflow.core as sf
 
 from time import sleep
 

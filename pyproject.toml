@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "scriptflow"
-version = "0.1.0"
-description = "Like a makefile but in python"
+version = "0.1.1"
+description = "Like a makefile but in python, a stripped-down system of Airflow or Luigi"
 authors = ["Thibaut Lamadon <thibaut.lamadon@gmail.com>"]
 
 [tool.poetry.dependencies]
@@ -9,12 +9,18 @@ python = "^3.8"
 rich = "^11.0.0"
 toml = "^0.10.2"
 click = "^8.0.3"
-numpy = "^1.22.2"
 asyncssh = "^2.9.0"
 requests = "^2.27.1"
+tinydb = "^4.7.0"
 
 [tool.poetry.dev-dependencies]
+
+[tool.poetry.scripts]
+scriptflow = 'scriptflow.cli:cli'
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.extras]
+dask = ["dask-jobqueue"]

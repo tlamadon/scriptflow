@@ -4,44 +4,92 @@ Small library that allows scheduling scripts asyncrhonously on different platfor
 
 The status is very experimental. I will likely be changing the interface as I go. 
 
-## Goal:
+## Goals:
 
  - [x] works on windows / osx / linux
  - [x] describe dependencies as python code (using await/async)
  - [x] describe scripts with input/output as code
  - [x] clean terminal feedback (using rich)
- - [x] HPC executor
  - [x] task retry
  - [x] check that output was generated 
  - [ ] notifications
- - [ ] send status to central web service
- - [ ] resume flows
+ - [x] send status to central web service
+ - [x] resume flows
  - [ ] clean output
  - [ ] named runs
  - [ ] store run information
- - [ ] asset diagnostic
- - [ ] simpler interface with default head executor and awaitable tasks
+ - [ ] output diagnostic / reporting (tracing how files were created)
+ - [x] simpler interface with default head executor and awaitable tasks
+ - [x] skip computation based on timestamp of inputs and outpus
  - [ ] load and store tasks results
- - [ ] docker Executor
- - [ ] aws executor
+ - executors :
+   - [x] local excutor using subprocess 
+   - [x] HPC excutor (monitoring qsub) 
+   - [ ] docker Executor 
+   - [ ] aws executor (probably using Ray)
+   - [ ] dask executor  
+ - [ ] cache flows in addition to caching tasks (avoid same task getting scheduled from 2 places)
+ - [x] add check on qsub return values
+ - [x] select flow by name from terminal 
+ - [ ] allow for glob output/input
+ - [ ] ? scripts can create tasks, not sure how to await them. 
+ - reporting:
+   - [ ] input and output hashes
+   - [ ] start and end datetimes
+
 
 ## Simple flow example:
 
-```python
-async def main():
-    cr = sf.HpcRunner(3)    
-    cr.log("starting loop")
-    loop = asyncio.create_task(cr.loop())
+Create a file `sflow.py` with:
 
-    tasks = []
-    for i in range(5):
-        t =  cr.createTask( sf.Task("sleep 2; echo {} > res{}.txt".format("hi",i).split(" "))
-                    .result(f"res{i}.txt")
-                    .uid(f"solve-{i}")))
-        tasks.append(t)
-        
-    await asyncio.gather(*tasks)
-```                    
+```python
+import scriptflow as sf
+
+# set main maestro
+cr = sf.CommandRunner(3)
+sf.set_main_maestro(cr)
+
+def combine_file():
+    with open('test_1.txt') as f:
+        a = int(f.readlines()[0])
+    with open('test_2.txt') as f:
+        b = int(f.readlines()[0])
+    with open('final.txt','w') as f:
+        f.write("{}\n".format(a+b))
+
+# define a flow called sleepit
+async def flow_sleepit():
+
+    i=1
+    t1 = sf.Task(["python", "-c", f"import time; time.sleep(5); open('test_{i}.txt','w').write('5');"])
+    t1.output(f"test_{i}.txt").uid(f"solve-{i}")
+
+    i=2
+    t2 = sf.Task(["python", "-c", f"import time; time.sleep(5); open('test_{i}.txt','w').write('4');"])
+    t2.output(f"test_{i}.txt").uid(f"solve-{i}")
+
+    await sf.bag(t1,t2)
+
+    tfinal = sf.Task(["python", "-c", "import sflow; sflow.combine_file()"])
+    tfinal.output(f"final.txt").uid(f"final").add_deps([t1.output_file,t2.output_file])
+    await tfinal
+```        
+
+then create a local env, activate, install and run!
+
+```shell
+python3 -m venv env
+source env/bin/activate
+pip install scriptflow
+scritpflow run sleepit
+```
+
+## Life cycle of a task
+
+1. the task object is created. All properties can be edited.
+2. the task is sent to an executor. At this point, the properties of the task are frozen. They can be read, copied but not changed. A unique ID id created from the task from its command and its inputs. The task can be sent by using the `start()` method, or it will be sent automatically when awaited.
+3. the task is awaited, and hence execution is blocked until the task is finished. Nothing can be done at that stage. Again, the task is automatically sent at this stage if it has not be done before. Also note that several tasks can be awaited in parallel by bagging them with `sf.bag(...)`.
+4. the task is completed, the await returns. The task has now it's output attached to it, it can be used in the creation of other tasks.
 
 ## Inspiration / Alternatives
 
