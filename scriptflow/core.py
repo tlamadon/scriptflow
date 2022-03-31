@@ -190,7 +190,7 @@ class CommandRunner:
                         self.done = self.done +1
                         p["job"].fut.set_result(p["job"])
 
-                        # append job to history 
+                        # append job to history - replace this with upsert
                         tj = Query()
                         if len(self.history.search(tj.hash ==  p["job"].hash))>0:
                             self.history.update({
