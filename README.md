@@ -100,3 +100,13 @@ I have tried to use the following three alternatives which are all truly excelen
  - [snakemake](https://snakemake.readthedocs.io/en/stable/)
 
 There were use cases that I could not implement cleanly in the dataflow model of nextflow. I didn't like that snakemake relied on file names to trigger rules, I was constently juggling complicated file names. Pydoit is really great, but I couldn't find how to extend it to build my own executor, and I always found myself confused writing new tasks and dealing with dependencies. 
+
+## Developing
+
+the package is managed using poetry, install poetry first then 
+
+```
+poetry install
+cd examples/simple-local
+poetry run scriptflow run sleepit
+```

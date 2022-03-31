@@ -1,11 +1,13 @@
 [tool.poetry]
 name = "scriptflow"
-version = "0.1.1"
+version = "0.1.3"
 description = "Like a makefile but in python, a stripped-down system of Airflow or Luigi"
 authors = ["Thibaut Lamadon <thibaut.lamadon@gmail.com>"]
+readme = "README.md"
+repository = "https://github.com/tlamadon/scriptflow"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.7"
 rich = "^11.0.0"
 toml = "^0.10.2"
 click = "^8.0.3"
