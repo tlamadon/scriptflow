@@ -20,7 +20,7 @@ jobs:
       # and poetry.lock is updated every time we add a new dependency to our project
       - restore_cache:
           keys: 
-            - deps-{{ checksum "poetry.lock" }}
+            - deps-{{ checksum "pyproject.toml" }}
 
       # Install the dependencies
       - run:
@@ -42,6 +42,9 @@ jobs:
           no_output_timeout: 20m
           command: |
             poetry run python -m pytest 
+
+
+
 
 # In the workflows section, we specify when we want to run the jobs defined
 workflows:
