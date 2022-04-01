@@ -1,5 +1,7 @@
 # scriptflow
 
+[![CircleCI](https://circleci.com/gh/tlamadon/scriptflow/tree/main.svg?style=svg)](https://circleci.com/gh/tlamadon/scriptflow/tree/main)
+
 Small library that allows scheduling scripts asyncrhonously on different platforms. Think of it as a Make when you can write the dependencies as python code, and that can run locally, on an HPC or in the cloud (cloud is not implemented just yet).
 
 The status is very experimental. I will likely be changing the interface as I go. 
