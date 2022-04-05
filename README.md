@@ -47,9 +47,15 @@ Create a file `sflow.py` with:
 ```python
 import scriptflow as sf
 
-# set main maestro
-cr = sf.CommandRunner(3)
-sf.set_main_maestro(cr)
+# set main options
+sf.init({
+    "executors":{
+        "local": {
+            "maxsize" : 5
+        } 
+    },
+    'debug':True
+})
 
 def combine_file():
     with open('test_1.txt') as f:
