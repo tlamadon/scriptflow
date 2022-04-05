@@ -28,6 +28,7 @@ async def main(func):
 
     # let the other guys finish
     await asyncio.sleep(1)
+    get_main_maestro().last_word()
 
 
 @click.group()

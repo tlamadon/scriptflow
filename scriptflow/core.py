@@ -10,7 +10,7 @@ from datetime import datetime
 import asyncio
 import logging
 import queue
-
+import requests
 
 from rich.console import Console
 from time import sleep
@@ -54,6 +54,8 @@ class Controller:
         self.done   = 0
         self.retry  = 0
         self.failed = 0
+        self.last_notify = ""
+        self.notifty_hash = conf.notify
 
         self.msg_queue = queue.Queue()
 
@@ -192,10 +194,35 @@ class Controller:
                     capacity += exec.size() + exec.available_slots()
 
                 status.update(f"running [green]queued:{self.task_queue.qsize()} [/green] [yellow]running:{running}/{capacity} [/yellow] [purple]done:{self.done} / failed:{self.failed}[/purple] ...")
+                # send updates to sever if any
+                self.notify(running, capacity)
+
                 await asyncio.sleep(0.1)
 
     def log(self, str):
         self.msg_queue.put(str)
+
+    """
+    notify server
+    """
+    def notify(self,running, capacity):
+
+        notify_str = "running={}&queued={}&completed={}&failed={}&retry={}".format(
+            running, self.task_queue.qsize(), self.done, self.failed, self.retry)
+
+        if notify_str != self.last_notify:
+            requests.get('http://scriptflow.lamadon.com/test.php?hash={}&{}'.format(self.notifty_hash, notify_str))
+            self.last_notify = notify_str
+
+    """
+    called when flow finishes
+    """
+    def last_word(self):
+        console.log("--------------------------------")
+        console.log("Thank you for using scriptflow!")
+        console.log("You ran {} tasks with {} fails.".format(self.done, self.failed))
+        console.log("--------------------------------")
+
 
 """
     The Runner interface is as follows:
@@ -274,124 +301,74 @@ class HpcRunner:
     {cmd}
     """
 
-    def __init__(self,max_proc):
-        self.max_proc = max_proc
-        self.queue = []
+    def __init__(self, conf):
+        self.max_proc = conf.maxsize
         self.processes = {}
-        self.finished = {}
-        self.console = Console()
-        self.done = 0
-        self.failed = 0
         self.job_params = {'procs':1, 'mem' : "16Gb", 'name':'psub'}
-        pass
 
-    def add(self,job):
-        self.queue.append(job)
+    def size(self):
+        return(len(self.processes))
 
-    def log(self,str):
-        console.log(str)
+    def available_slots(self):
+        return self.max_proc - len(self.processes)
 
-    async def loop(self):
-        with console.status("Running ...") as status:
-            while True:
+    def add(self, task):
 
-                # check if we can add a new process
-                if (len(self.queue)>0) & (len(self.processes) < self.max_proc):
-                    
-                    j = self.queue[0]
+        # create the script
+        script_content = self.script_template.format(
+            name = "sf-{}".format(task.uid),
+            mem = task.mem,
+            procs = task.ncore,
+            wd = os.getcwd(), 
+            cmd = " ".join(task.get_command()) )
 
-                    # checking if the task needs to be redone
-                    # to be done   
-                    if os.path.exists(j.output_file):
-                        # console.log("checking {}".format(j.output_file))
-                        output_time = os.path.getmtime(j.output_file)  
+        tmp = tempfile.NamedTemporaryFile(delete=False)
+        tmp_script_filename = tmp.name
+        tmp.write(script_content.encode())
+        tmp.close()
 
-                        UP_TO_DATE = True
-                        for f in j.deps:
-                            if os.path.getmtime(f) > output_time:    
-                                console.log("{} input {} more recent than output".format(j.uid, f))
-                                UP_TO_DATE = False
-                                break 
-                        
-                        if UP_TO_DATE:
-                            console.log(f"up to date, skipping [red]{j.uid}[/red]")
-                            self.queue.remove(j)
-                            j.fut.set_result(j)
-                            continue       
+        command = ["qsub", tmp_script_filename]
+        try:
+            output = subprocess.check_output(command).decode()
+            JOB_ID = output.replace("\n","")
+            
+            self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"S"}          
+        except subprocess.CalledProcessError as e:
+            self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"F"}          
 
-                    console.log(f"adding [blue]{j.uid}[/blue]")
-                    console.log(" - cmd: {}".format( " ".join(j.get_command() ) ))
-
-                    # create the script
-                    script_content = self.script_template.format(
-                        name = "sf-{}".format(j.uid),
-                        mem = j.mem,
-                        procs = j.ncore,
-                        wd = os.getcwd(), 
-                        cmd = " ".join(j.get_command()) )
-
-                    tmp = tempfile.NamedTemporaryFile(delete=False)
-                    tmp_script_filename = tmp.name
-                    tmp.write(script_content.encode())
-                    tmp.close()
-
-                    command = ["qsub", tmp_script_filename]
-                    try:
-                        output = subprocess.check_output(command).decode()
-                        JOB_ID = output.replace("\n","")
-                        
-                        self.processes[j.hash] = {"JOB_ID" : JOB_ID, "job": j, "status":"S"}          
-                        self.queue.remove(j)
-                        status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] [purple]failed:{self.failed}[/purple] ...")
-
-                    except subprocess.CalledProcessError as e:
-                        console.log("issue with qsub, giving it a short break...")
-                        status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] [purple]failed:{self.failed}[/purple] ...")
-                        await asyncio.sleep(2)
-
+    async def loop(self,controller):
+        while True:
+            
+            # checking job status
+            output = subprocess.check_output("qstat").decode()
+            lines = output.split("\n") 
+            job_status = {}
+            for l in lines[2:]:                    
+                vals = l.split()
+                if len(vals)<3:
                     continue
-                
-                # checking job status
-                output = subprocess.check_output("qstat").decode()
-                lines = output.split("\n") 
-                job_status = {}
-                for l in lines[2:]:                    
-                    vals = l.split()
-                    if len(vals)<3:
-                        continue
-                    job_status[vals[0]] = {'status':vals[4]}
+                job_status[vals[0]] = {'status':vals[4]}
 
-                to_remove = []
-                for (k,p) in self.processes.items():
+            to_remove = []
+            for (k,p) in self.processes.items():
 
-                    if p["JOB_ID"] not in job_status.keys():
+                if p["JOB_ID"] not in job_status.keys():
+                    # we expire the job if longer than 5 minutes
+                    if time.time() - p["JOB_ID"]["start"] > 5*60:
+                        job_status[p["JOB_ID"]] = {'status':'C'}
+                    else:
                         continue
 
-                    if job_status[p["JOB_ID"]]['status'] == 'C':
-                        console.log("job {} finished".format(p["job"].uid))   
-                        to_remove.append(k)
+                if job_status[p["JOB_ID"]]['status'] == 'C':
+                    console.log("job {} finished".format(p["job"].uid))   
+                    to_remove.append(k)
 
-                for k in to_remove:
-                    del self.processes[k]                 
-                    status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] [purple]failed:{self.failed}[/purple] ...")
+            for k in to_remove:
+                del self.processes[k]
+                controller.add_completed( p["job"] )
+                 
+            await asyncio.sleep(2)
 
-                await asyncio.sleep(2)
-
-
-# async def main():
-#     cr = CommandRunner(3)    
-#     cr.log("starting loop")
-#     loop = asyncio.create_task(cr.loop())
-
-#     # cr.add(Task(["python", "-c", "import time; time.sleep(3); print('done')"]).uid("task1"))
-#     # cr.add(Task(["python", "-c", "import time; time.sleep(3); print('done')"]).uid("task2"))
-
-#     t1 = cr.createTask(Task(["python", "-c", "import time; time.sleep(5); print('done')"]).uid("task1"))
-#     t2 = cr.createTask(Task(["python", "-c", "import time; time.sleep(5); print('done')"]).uid("task2"))
-
-#     await asyncio.gather(t1,t2)
-
-# asyncio.run(main())
 
 EXECUTORS = {    
     "local" : CommandRunner,
