@@ -15,6 +15,7 @@ asyncssh = "^2.9.0"
 requests = "^2.27.1"
 tinydb = "^4.7.0"
 pytest = "^7.1.1"
+omegaconf = "^2.1.1"
 
 [tool.poetry.dev-dependencies]
 

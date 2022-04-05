@@ -7,12 +7,16 @@ import time
 import asyncio
 import tempfile
 from datetime import datetime
+import asyncio
+import logging
+import queue
+
 
 from rich.console import Console
 from time import sleep
 from os.path import exists
 from tinydb import TinyDB, Query
-import hashlib
+from omegaconf import OmegaConf
 
 console = Console()
 
@@ -36,185 +40,224 @@ def bag(*args, **kwargs):
 from rich.console import Console
 from time import sleep
 
-"""
-
-note: 
- - use input and output for dependencies and generated stuff
- - use set_args and set_return for input parameters and return values that should be collected
 
 """
-class Task:
-    cmd =""
-    uid=""
-    mem="32Gb"
-    ncore="10"
-    retry=0
+This class creates the link between the user and the different executors.
+It also contains the main task logic that doesn't have to do with simply running the command, such 
+as checking if the task needs to be run, and wether it has run correctly.
+"""
+class Controller:
 
-    def __init__(self, cmd):
-        self.fut = asyncio.get_event_loop().create_future()
-        self.running = False
-        self.task = None
-        self.cmd = cmd
-        self.deps = []
-        self.output_file = ""
-        self.quiet = True
-        self.hash = ""
+    def __init__(self, conf) -> None:
+        self.history = TinyDB('sf.json')
+        self.task_queue = queue.Queue()
+        self.done   = 0
+        self.retry  = 0
+        self.failed = 0
 
-    def __await__(self):
-        if self.task is None:
-            self.start()
-        return self.fut.__await__()
+        self.msg_queue = queue.Queue()
 
-    def start(self):
-        self.running = True
-        self.hash = hashlib.md5("".join(self.get_command()).encode()).hexdigest()
+        # for now we use one executor
+        if conf.executors:
+            print(conf.executors)
+            self.executors = { k:EXECUTORS[k](v) for k,v in conf.executors.items()}
+        else:
+            self.executors = { "local": CommandRunner(10) }
 
-        get_main_maestro().add(self)
-        return(self)
+    """
+    The user tells us that a task should be added
+    """
+    def add(self, task):
 
-    def result(self, return_file):
-        self.return_file = return_file    
-        return self  
+        # check if the task is up to date, 
+        # this allows to skip the task right away!
+        if self.check_task_uptodate(task):
+            self.complete_task(task)
+            return
 
-    def output(self, output_file):
-        self.output_file = output_file    
-        return self     
+        # otherwise, we add the task to the queue
+        self.task_queue.put(task)
 
-    def retry(self, retry):
-        self.retry = retry    
-        return self     
+    """
+    An executor reports a finished task
+    """
+    def add_completed(self, task):
 
-    def input(self, input_file):
-        # check that the input file actually exist and extract its values, too soon?
-        self.input_file = input_file  
-        return self  
+        task.props["finish_time"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
-    def add_deps(self, deps):
+        # retry if output file doesn't exist
+        if (len(task.return_file)>0) & (not exists(task.return_file)):
 
-        if isinstance(deps, str):
-            self.deps.append(deps)
-            return(self)
+            if  task.retry>0:
+                self.log("[red]output file missing for {}, retrying... [/red]".format(task.uid))  
+                task.retry = task.retry - 1
+                self.add(task)
+            else:
+                self.log("[red]output file missing for {}, failing! [/red]".format(task.uid))  
+                self.failed = self.failed + 1
+                self.complete_task(task)
 
-        if not hasattr(deps, "__iter__"): #returns True if type of iterable - same problem with strings
-            deps = list(deps)
-        
-        for dep in deps:
-            self.deps.append(dep)
+        # everything normal
+        else:
+            self.done = self.done +1
+            self.complete_task(task)
 
-        return(self)
+    """
+        Main loop that takes tasks from the global queue and send them to executors.
+        This should not send tasks if the executor queue is already full.
 
-    def name(self,name):
-        self.name = name
+        We might want to make this event-driven, ie we check only if:
+        - a new task is added
+        - a task finished
+    """
+    def update(self):
 
-    def uid(self,uid):
-        self.uid = uid
-        return self
+        if self.task_queue.empty():
+            return
 
-    def get_command(self):
-        return self.cmd
+        # we check to see if any exectutor has space in their queues
+        for exec in self.executors.values():
+            if exec.available_slots()>0:
+                # take the next task
+                task = self.task_queue.get()
+
+                # send it to the executor
+                task.props["start_time"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                exec.add(task)
+
+    """
+    Check if the task is up to date 
+    """
+    def check_task_uptodate(self, task):
+
+        # checking if the task needs to be redone
+        if os.path.exists(task.output_file):
+            # console.log("checking {}".format(j.output_file))
+            output_time = os.path.getmtime(task.output_file)  
+
+            UP_TO_DATE = True
+            for f in task.deps:
+                if os.path.getmtime(f) > output_time:    
+                    self.log("task [red]{}[/red]: input [green]{}[/green] more recent than output".format(task.uid, f))
+                    UP_TO_DATE = False
+                    break 
+            
+            if UP_TO_DATE:
+                self.log(f"task [red]{task.uid}[/red] is up to date, skipping it.")
+                return                                                     
+
+        self.log(f"adding [red]{task.uid}[/red]")
+        self.log(" - cmd: {}".format( " ".join(task.get_command() ) ))
+
+    def complete_task(self, task):
+        # load the results if any
+        # TBD
+
+        self.update_history(task)
+
+        # mark the promise as completed and set it to itself
+        assert asyncio.isfuture(task.fut)
+        assert not task.fut.done()
+        task.fut.set_result(task)
+
+    def update_history(self, task):
+        # append job to history - replace this with upsert
+        tj = Query()
+        self.history.upsert({
+            'deps' : task.deps,
+            'output' : task.output_file,
+            'cmd': task.get_command(),
+            'start_time': task.props['start_time'],
+            'end_time': task.props['finish_time']
+        }, tj.hash == task.hash)
+
+
+    async def start_loops(self):
+        for exec in self.executors.values():
+            asyncio.create_task(exec.loop(self))
+
+        # run my own event loop
+        with console.status("Running ...") as status:
+            while True:
+                while not self.msg_queue.empty():
+                    msg = self.msg_queue.get()
+                    console.log(msg)
+
+                self.update()
+
+                running = 0
+                capacity = 0
+                for exec in self.executors.values():
+                    running += exec.size()
+                    capacity += exec.size() + exec.available_slots()
+
+                status.update(f"running [green]queued:{self.task_queue.qsize()} [/green] [yellow]running:{running}/{capacity} [/yellow] [purple]done:{self.done} / failed:{self.failed}[/purple] ...")
+                await asyncio.sleep(0.1)
+
+    def log(self, str):
+        self.msg_queue.put(str)
+
+"""
+    The Runner interface is as follows:
+    The runner is in charge of syncing files input/output, meaning if it is running remotely, it needs to send the input and bring back the output.
+
+     - available_slots() returns a positive number with available resources, returns 0 if at capacity
+     - add(task): this starts the job right away, if we are at capacity we should throw an error, the controller should be checking capacity
+     - loop: a loop that runs in the event-loop, when a task completes, it calls the conductor `add_completed`.
+
+"""
 
 class CommandRunner:
 
-    def __init__(self,max_proc):
-        self.max_proc = max_proc
-        self.queue = []
+    def __init__(self, conf):
+        self.max_proc = conf.maxsize
         self.processes = {}
-        self.finished = {}
-        self.console = Console()
-        self.done = 0
-        self.history = TinyDB('sf.json')
-        pass
 
-    def add(self,cmd):
-        self.queue.append(cmd)
+    def size(self):
+        return(len(self.processes))
 
-    def log(self,str):
-        console.log(str)
+    def available_slots(self):
+        return self.max_proc - len(self.processes)
 
-    async def loop(self):
+    """
+        Start tasks
+    """
+    def add(self, task):
 
-        with console.status("Running ...") as status:
-            while True:
+        if task.quiet:
+            subp = subprocess.Popen(task.get_command(),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.STDOUT)
+        else:
+            subp = subprocess.Popen(task.get_command())
+                #stdout=subprocess.DEVNULL,
+                #stderr=subprocess.STDOUT)
 
-                # check if we can add a new process
-                if (len(self.queue)>0) & (len(self.processes) < self.max_proc):
-                    
-                    j = self.queue[0]
-                    self.queue.remove(j)
+        self.processes[task.hash] = {
+            "proc" : subp, 
+            "task": task , 
+            'start_time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        }                
 
-                    # checking if the task needs to be redone
-                    # to be done   
-                    if os.path.exists(j.output_file):
-                        # console.log("checking {}".format(j.output_file))
-                        output_time = os.path.getmtime(j.output_file)  
+    """
+        Continuously checks on the tasks
+    """
+    async def loop(self, controller):
+        while True:
 
-                        UP_TO_DATE = True
-                        for f in j.deps:
-                            if os.path.getmtime(f) > output_time:    
-                                console.log("{} input {} more recent than output".format(j.uid, f))
-                                UP_TO_DATE = False
-                                break 
-                        
-                        if UP_TO_DATE:
-                            console.log(f"up to date, skipping [red]{j.uid}[/red]")
-                            #self.queue.remove(j)
-                            j.fut.set_result(j)
-                            continue                                                     
+            to_remove = []
+            for (k,p) in self.processes.items():
+                poll_val = p["proc"].poll()
+                if poll_val is not None:
+                    to_remove.append(k)
 
-                    console.log(f"adding [red]{j.uid}[/red]")
-                    console.log("cmd: {}".format( " ".join(j.get_command() ) ))
-
-
-                    if j.quiet:
-                        subp = subprocess.Popen(j.get_command(),
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.STDOUT)
-                    else:
-                        subp = subprocess.Popen(j.get_command())
-                            #stdout=subprocess.DEVNULL,
-                            #stderr=subprocess.STDOUT)
-
-
-                    self.processes[j.hash] = {"proc" : subp, "job": j , 'start_time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")}                
-                    #self.queue.remove(j)
-                    status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] ...")
+            for k in to_remove:
+                task = self.processes[k]["task"]
+                del self.processes[k]       
+                controller.add_completed( task )
                 
-                to_remove = []
-                for (k,p) in self.processes.items():
-                    poll_val = p["proc"].poll()
-                    if poll_val is not None:
-                        console.log("job {} done r={}".format(p["job"].uid, poll_val))   
-                        
-                        to_remove.append(k)
-                        self.finished[p["job"].hash] = True
-                        self.done = self.done +1
-                        p["job"].fut.set_result(p["job"])
+            await asyncio.sleep(0.1)
 
-                        # append job to history - replace this with upsert
-                        tj = Query()
-                        if len(self.history.search(tj.hash ==  p["job"].hash))>0:
-                            self.history.update({
-                                'deps' : p["job"].deps,
-                                'output' : p["job"].output_file,
-                                'cmd':p["job"].get_command(),
-                                'start_time':p['start_time'],
-                                'end_time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                            },tj.hash ==  p["job"].hash)
-                        else:
-                            self.history.insert({
-                                'hash': p["job"].hash, 
-                                'deps' : p["job"].deps,
-                                'output' : p["job"].output_file,
-                                'cmd':p["job"].get_command(),
-                                'start_time':p['start_time'],
-                                'end_time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                            })
-
-                for k in to_remove:
-                    del self.processes[k]                 
-                    status.update(f"running [green]queued:{len(self.queue)}[/green] [yellow]running:{len(self.processes)}[/yellow] [purple]done:{self.done}[/purple] ...")
-
-                await asyncio.sleep(0.1)
 
 class HpcRunner:
 
@@ -277,7 +320,7 @@ class HpcRunner:
                             continue       
 
                     console.log(f"adding [blue]{j.uid}[/blue]")
-                    console.log("cmd: {}".format( " ".join(j.get_command() ) ))
+                    console.log(" - cmd: {}".format( " ".join(j.get_command() ) ))
 
                     # create the script
                     script_content = self.script_template.format(
@@ -326,25 +369,6 @@ class HpcRunner:
 
                     if job_status[p["JOB_ID"]]['status'] == 'C':
                         console.log("job {} finished".format(p["job"].uid))   
-
-                        # checking that output file exists
-                        if not exists(p["job"].return_file):
-
-                            if  p["job"].retry>0:
-                                console.log("[red]output file missing for {}, retrying... [/red]".format(p["job"].uid))  
-                                p["job"].retry = p["job"].retry -1
-                                self.add(p["job"])
-                            else:
-                                console.log("[red]output file missing for {}, failing! [/red]".format(p["job"].uid))  
-                                self.finished[p["job"].uid] = True
-                                self.failed = self.failed + 1
-                                p["job"].fut.set_result(p["job"])
-
-                        else:
-                            self.finished[p["job"].uid] = True
-                            self.done = self.done +1
-                            p["job"].fut.set_result(p["job"])
-
                         to_remove.append(k)
 
                 for k in to_remove:
@@ -369,13 +393,7 @@ class HpcRunner:
 
 # asyncio.run(main())
 
-
-# creating the main executor!
-maestro = None
-
-def set_main_maestro(cr):
-    global maestro
-    maestro = cr
-
-def get_main_maestro():
-    return maestro
+EXECUTORS = {    
+    "local" : CommandRunner,
+    "hpc" : HpcRunner,
+}
