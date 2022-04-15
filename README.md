@@ -36,6 +36,10 @@ The status is very experimental. I will likely be changing the interface as I go
  - reporting:
    - [ ] input and output hashes
    - [x] start and end datetimes
+ - notification system
+   - [ ] allow to sned messages
+   - [ ] allow for runs
+   - [ ] allow to send messages with html content like images
  - writing tasks and flows 
    - [ ] cache flows in addition to caching tasks (avoid same task getting scheduled from 2 places)
    - [ ] a functional api for task creation with hooks
