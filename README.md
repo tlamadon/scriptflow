@@ -24,6 +24,7 @@ The status is very experimental. I will likely be changing the interface as I go
  - [x] simpler interface with default head executor and awaitable tasks
  - [x] skip computation based on timestamp of inputs and outpus
  - [ ] load and store tasks results
+ - [ ] remove existing output of task if task is started (issue with failing tasks that look like they worked)
  - executors :
    - [x] local excutor using subprocess 
    - [x] HPC excutor (monitoring qsub) 
