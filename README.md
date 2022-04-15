@@ -14,13 +14,13 @@ The status is very experimental. I will likely be changing the interface as I go
  - [x] clean terminal feedback (using rich)
  - [x] task retry
  - [x] check that output was generated 
- - [ ] notifications
+ - [x] notifications (using light webserver at [scriptflow.lamadon.com](http://scriptflow.lamadon.com/) )
  - [x] send status to central web service
  - [x] resume flows
  - [ ] clean output
  - [ ] named runs
- - [ ] store run information
- - [ ] output diagnostic / reporting (tracing how files were created)
+ - [x] store run information
+ - [x] output diagnostic / reporting (tracing how files were created)
  - [x] simpler interface with default head executor and awaitable tasks
  - [x] skip computation based on timestamp of inputs and outpus
  - [ ] load and store tasks results
@@ -30,14 +30,20 @@ The status is very experimental. I will likely be changing the interface as I go
    - [ ] docker Executor 
    - [ ] aws executor (probably using Ray)
    - [ ] dask executor  
- - [ ] cache flows in addition to caching tasks (avoid same task getting scheduled from 2 places)
  - [x] add check on qsub return values
  - [x] select flow by name from terminal 
- - [ ] allow for glob output/input
  - [ ] ? scripts can create tasks, not sure how to await them. 
  - reporting:
    - [ ] input and output hashes
-   - [ ] start and end datetimes
+   - [x] start and end datetimes
+ - writing tasks and flows 
+   - [ ] cache flows in addition to caching tasks (avoid same task getting scheduled from 2 places)
+   - [ ] a functional api for task creation with hooks
+   - [ ] a functional api for flows
+   - [ ] controller could parse the log file for results (looking for specific triggers)
+   - [ ] allow for glob output/input
+ - cli
+   - [ ] pass arguments to flows 
 
 
 ## Simple flow example:
