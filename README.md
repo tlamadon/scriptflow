@@ -47,8 +47,10 @@ The status is very experimental. I will likely be changing the interface as I go
    - [ ] a functional api for flows
    - [ ] controller could parse the log file for results (looking for specific triggers)
    - [ ] allow for glob output/input
+   - [ ] provide simple toml/json interface for simple tasks and flows
  - cli
    - [ ] pass arguments to flows 
+   - [ ] create portable executable
 
 
 ## Simple flow example:
