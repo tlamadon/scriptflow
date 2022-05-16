@@ -146,10 +146,11 @@ class Controller:
             
             if UP_TO_DATE:
                 self.log(f"task [red]{task.uid}[/red] is up to date, skipping it.")
-                return                                                     
+                return(True)
 
         self.log(f"adding [red]{task.uid}[/red]")
         self.log(" - cmd: {}".format( " ".join(task.get_command() ) ))
+        return(False)
 
     def complete_task(self, task):
         # load the results if any
@@ -164,6 +165,8 @@ class Controller:
 
     def update_history(self, task):
         # append job to history - replace this with upsert
+        # @fixme here sometimes the props don't exist yet, they need to be given a default, or ignored. This happen
+        # this happens in particular when skipping the task (then it needs to load first)
         tj = Query()
         self.history.upsert({
             'deps' : task.deps,
