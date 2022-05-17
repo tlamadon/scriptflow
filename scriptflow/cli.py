@@ -8,6 +8,8 @@ from inspect import getmembers, isfunction
 import scriptflow.core as sf
 import os
 
+from .glob import get_main_maestro
+
 spec = importlib.util.spec_from_file_location("", os.getcwd() + "/sflow.py")
 foo = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(foo)
@@ -17,12 +19,17 @@ spec.loader.exec_module(foo)
 """
 async def main(func):
 
-    asyncio.create_task( sf.get_main_maestro().loop() )
+    asyncio.create_task( get_main_maestro().start_loops() )
     os.makedirs('.sf', exist_ok=True)
 
     await func()      
     # await asyncio.gather(cf_vdec_growth(), cf_vdec_level())
     # requests.get('http://scriptflow.lamadon.com/test.php?hash=12345&running=10')
+
+    # let the other guys finish
+    await asyncio.sleep(1)
+    get_main_maestro().last_word()
+
 
 @click.group()
 def cli():

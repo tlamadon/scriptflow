@@ -1,1 +1,3 @@
 sf-solve-*
+**/__pycache__/
+dist/

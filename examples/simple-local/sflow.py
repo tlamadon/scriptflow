@@ -8,9 +8,16 @@ Simple example with dependencis. Install scriptflow with pip install scriptflow 
 
 import scriptflow as sf
 
-# set main maestro
-cr = sf.CommandRunner(3)
-sf.set_main_maestro(cr)
+# set main options
+sf.init({
+    "executors":{
+        "local": {
+            "maxsize" : 5
+        } 
+    },
+    'debug':True
+})
+
 
 def compare_file():
 
@@ -40,6 +47,10 @@ async def flow_sleepit():
     tfinal = sf.Task(["python", "-c", "import sflow; sflow.compare_file()"])
     tfinal.output(f"final.txt").uid(f"final").add_deps([t1.output_file,t2.output_file])
     await tfinal
+
+    tasks = [sf.Task(["python", "-c", f"import time; time.sleep(5); open('test_{i}.txt','w').write('4');"]).uid(f"test_{i}").output(f"test_{i}.txt") for i in range(10,20)]
+    await sf.bag(*tasks)
+
 
 
 

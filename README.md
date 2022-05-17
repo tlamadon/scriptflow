@@ -14,30 +14,43 @@ The status is very experimental. I will likely be changing the interface as I go
  - [x] clean terminal feedback (using rich)
  - [x] task retry
  - [x] check that output was generated 
- - [ ] notifications
+ - [x] notifications (using light webserver at [scriptflow.lamadon.com](http://scriptflow.lamadon.com/) )
  - [x] send status to central web service
  - [x] resume flows
  - [ ] clean output
  - [ ] named runs
- - [ ] store run information
- - [ ] output diagnostic / reporting (tracing how files were created)
+ - [x] store run information
+ - [x] output diagnostic / reporting (tracing how files were created)
  - [x] simpler interface with default head executor and awaitable tasks
  - [x] skip computation based on timestamp of inputs and outpus
  - [ ] load and store tasks results
+ - [ ] remove existing output of task if task is started (issue with failing tasks that look like they worked)
  - executors :
    - [x] local excutor using subprocess 
    - [x] HPC excutor (monitoring qsub) 
    - [ ] docker Executor 
    - [ ] aws executor (probably using Ray)
    - [ ] dask executor  
- - [ ] cache flows in addition to caching tasks (avoid same task getting scheduled from 2 places)
  - [x] add check on qsub return values
  - [x] select flow by name from terminal 
- - [ ] allow for glob output/input
  - [ ] ? scripts can create tasks, not sure how to await them. 
  - reporting:
    - [ ] input and output hashes
-   - [ ] start and end datetimes
+   - [x] start and end datetimes
+ - notification system
+   - [ ] allow to sned messages
+   - [ ] allow for runs
+   - [ ] allow to send messages with html content like images
+ - writing tasks and flows 
+   - [ ] cache flows in addition to caching tasks (avoid same task getting scheduled from 2 places)
+   - [ ] a functional api for task creation with hooks
+   - [ ] a functional api for flows
+   - [ ] controller could parse the log file for results (looking for specific triggers)
+   - [ ] allow for glob output/input
+   - [ ] provide simple toml/json interface for simple tasks and flows
+ - cli
+   - [ ] pass arguments to flows 
+   - [ ] create portable executable
 
 
 ## Simple flow example:
@@ -47,9 +60,15 @@ Create a file `sflow.py` with:
 ```python
 import scriptflow as sf
 
-# set main maestro
-cr = sf.CommandRunner(3)
-sf.set_main_maestro(cr)
+# set main options
+sf.init({
+    "executors":{
+        "local": {
+            "maxsize" : 5
+        } 
+    },
+    'debug':True
+})
 
 def combine_file():
     with open('test_1.txt') as f:
@@ -112,8 +131,11 @@ poetry install
 cd examples/simple-local
 poetry run scriptflow run sleepit
 ```
+<<<<<<< HEAD
 
 ### Docker images to try the different schedulers
 
  - [PBS](https://openpbs.atlassian.net/wiki/spaces/PBSPro/pages/79298561/Using+Docker+to+Instantiate+PBS)
  - [slurm](https://medium.com/analytics-vidhya/slurm-cluster-with-docker-9f242deee601)
+=======
+>>>>>>> 11d8c182674fc8e56777cdcef47d119cd9f8d692
