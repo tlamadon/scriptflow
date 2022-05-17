@@ -131,11 +131,9 @@ poetry install
 cd examples/simple-local
 poetry run scriptflow run sleepit
 ```
-<<<<<<< HEAD
 
 ### Docker images to try the different schedulers
 
  - [PBS](https://openpbs.atlassian.net/wiki/spaces/PBSPro/pages/79298561/Using+Docker+to+Instantiate+PBS)
  - [slurm](https://medium.com/analytics-vidhya/slurm-cluster-with-docker-9f242deee601)
 =======
->>>>>>> 11d8c182674fc8e56777cdcef47d119cd9f8d692
