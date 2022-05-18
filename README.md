@@ -48,6 +48,7 @@ The status is very experimental. I will likely be changing the interface as I go
    - [ ] controller could parse the log file for results (looking for specific triggers)
    - [ ] allow for glob output/input
    - [ ] provide simple toml/json interface for simple tasks and flows
+   - [ ] use `shlex` to parse command from strings
  - cli
    - [ ] pass arguments to flows 
    - [ ] create portable executable
