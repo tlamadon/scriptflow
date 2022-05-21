@@ -168,13 +168,19 @@ class Controller:
         # @fixme here sometimes the props don't exist yet, they need to be given a default, or ignored. This happen
         # this happens in particular when skipping the task (then it needs to load first)
         tj = Query()
-        self.history.upsert({
+
+        newdict = { 
             'deps' : task.deps,
             'output' : task.output_file,
-            'cmd': task.get_command(),
-            'start_time': task.props['start_time'],
-            'end_time': task.props['finish_time']
-        }, tj.hash == task.hash)
+            'cmd': task.get_command()
+        }
+
+        if 'start_time' in task.props.keys():
+            newdict['start_time'] = task.props['start_time']
+        if 'end_time' in task.props.keys():
+            newdict['end_time'] = task.props['end_time']
+
+        self.history.upsert(newdict, tj.hash == task.hash)
 
 
     async def start_loops(self):
