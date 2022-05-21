@@ -18,6 +18,10 @@ from os.path import exists
 from tinydb import TinyDB, Query
 from omegaconf import OmegaConf
 
+from .task import Task
+from .runners import *
+from .glob import *
+
 console = Console()
 
 # print(toml.load("jmp.toml"))
@@ -40,6 +44,13 @@ def bag(*args, **kwargs):
 from rich.console import Console
 from time import sleep
 
+class FileSystem:
+
+    def __init__(self) -> None:
+        pass
+
+    def exists(self, filename):
+        return exists(filename)
 
 """
 This class creates the link between the user and the different executors.
@@ -48,28 +59,32 @@ as checking if the task needs to be run, and wether it has run correctly.
 """
 class Controller:
 
-    def __init__(self, conf) -> None:
+    def __init__(self, conf = {}, runner = None) -> None:
+        conf = OmegaConf.create(conf)
         self.history = TinyDB('sf.json')
         self.task_queue = queue.Queue()
         self.done   = 0
         self.retry  = 0
         self.failed = 0
         self.last_notify = ""
-        self.notifty_hash = conf.notify
+        self.notifty_hash = conf.get('notify',None)
+        self.fs = FileSystem()
 
         self.msg_queue = queue.Queue()
 
-        # for now we use one executor
-        if conf.executors:
+        # we take teh runner if passed (mostly for testing)
+        if runner is not None:
+            self.executors = { "local": runner }
+        elif 'executors' in conf.keys():
             print(conf.executors)
             self.executors = { k:EXECUTORS[k](v) for k,v in conf.executors.items()}
         else:
-            self.executors = { "local": CommandRunner(10) }
+            self.executors = { "local": CommandRunner({'maxsize':4}) }
 
     """
     The user tells us that a task should be added
     """
-    def add(self, task):
+    def add(self, task:Task):
 
         # check if the task is up to date, 
         # this allows to skip the task right away!
@@ -82,14 +97,14 @@ class Controller:
         self.task_queue.put(task)
 
     """
-    An executor reports a finished task
+    An executor/runner reports a finished task
     """
-    def add_completed(self, task):
+    def add_completed(self, task:Task) -> None:
 
-        task.props["finish_time"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        task.set_prop("finish_time", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
 
         # retry if output file doesn't exist
-        if (len(task.return_file)>0) & (not exists(task.return_file)):
+        if (len(task.get_outputs())>0) and (not exists(task.get_outputs()[0])):
 
             if  task.retry>0:
                 self.log("[red]output file missing for {}, retrying... [/red]".format(task.uid))  
@@ -131,8 +146,9 @@ class Controller:
                     return
 
                 # send it to the executor
-                task.props["start_time"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                task.set_prop('start_time',datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
                 exec.add(task)
+                return
 
     """
     Check if the task is up to date 
@@ -182,13 +198,10 @@ class Controller:
             'cmd': task.get_command()
         }
 
-        if 'start_time' in task.props.keys():
-            newdict['start_time'] = task.props['start_time']
-        if 'end_time' in task.props.keys():
-            newdict['end_time'] = task.props['end_time']
+        # add all available props
+        newdict.update(task.props)
 
         self.history.upsert(newdict, tj.hash == task.hash)
-
 
     async def start_loops(self):
         for exec in self.executors.values():
@@ -197,12 +210,16 @@ class Controller:
         # run my own event loop
         with console.status("Running ...") as status:
             while True:
+
+                # logging messages
                 while not self.msg_queue.empty():
                     msg = self.msg_queue.get()
                     console.log(msg)
 
+                # check tasks
                 self.update()
 
+                # updating status
                 running = 0
                 capacity = 0
                 for exec in self.executors.values():
@@ -240,153 +257,11 @@ class Controller:
         console.log("--------------------------------")
 
 
-"""
-    The Runner interface is as follows:
-    The runner is in charge of syncing files input/output, meaning if it is running remotely, it needs to send the input and bring back the output.
+def init(dict):    
+    conf = OmegaConf.create(dict)
 
-     - available_slots() returns a positive number with available resources, returns 0 if at capacity
-     - add(task): this starts the job right away, if we are at capacity we should throw an error, the controller should be checking capacity
-     - loop: a loop that runs in the event-loop, when a task completes, it calls the conductor `add_completed`.
+    logging.basicConfig(filename='scriptflow.log', level=logging.DEBUG)
 
-"""
-
-class CommandRunner:
-
-    def __init__(self, conf):
-        self.max_proc = conf.maxsize
-        self.processes = {}
-
-    def size(self):
-        return(len(self.processes))
-
-    def available_slots(self):
-        return self.max_proc - len(self.processes)
-
-    """
-        Start tasks
-    """
-    def add(self, task):
-
-        if task.quiet:
-            subp = subprocess.Popen(task.get_command(),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.STDOUT)
-        else:
-            subp = subprocess.Popen(task.get_command())
-                #stdout=subprocess.DEVNULL,
-                #stderr=subprocess.STDOUT)
-
-        self.processes[task.hash] = {
-            "proc" : subp, 
-            "task": task , 
-            'start_time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        }                
-
-    """
-        Continuously checks on the tasks
-    """
-    async def loop(self, controller):
-        while True:
-
-            to_remove = []
-            for (k,p) in self.processes.items():
-                poll_val = p["proc"].poll()
-                if poll_val is not None:
-                    to_remove.append(k)
-
-            for k in to_remove:
-                task = self.processes[k]["task"]
-                del self.processes[k]       
-                controller.add_completed( task )
-                
-            await asyncio.sleep(0.1)
-
-
-class HpcRunner:
-
-    script_template = """
-    #PBS -N {name}
-    #PBS -j oe
-    #PBS -V
-    #PBS -l procs={procs},mem={mem}
-    #PBS -l walltime=12:00:00
-
-    module load julia/1.6.1
-    cd {wd}
-
-    {cmd}
-    """
-
-    def __init__(self, conf):
-        self.max_proc = conf.maxsize
-        self.processes = {}
-        self.job_params = {'procs':1, 'mem' : "16Gb", 'name':'psub'}
-
-    def size(self):
-        return(len(self.processes))
-
-    def available_slots(self):
-        return self.max_proc - len(self.processes)
-
-    def add(self, task):
-
-        # create the script
-        script_content = self.script_template.format(
-            name = "sf-{}".format(task.uid),
-            mem = task.mem,
-            procs = task.ncore,
-            wd = os.getcwd(), 
-            cmd = " ".join(task.get_command()) )
-
-        tmp = tempfile.NamedTemporaryFile(delete=False)
-        tmp_script_filename = tmp.name
-        tmp.write(script_content.encode())
-        tmp.close()
-
-        command = ["qsub", tmp_script_filename]
-        try:
-            output = subprocess.check_output(command).decode()
-            JOB_ID = output.replace("\n","")
-            
-            self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"S"}          
-        except subprocess.CalledProcessError as e:
-            self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"F"}          
-
-    async def loop(self,controller):
-        while True:
-            
-            # checking job status
-            output = subprocess.check_output("qstat").decode()
-            lines = output.split("\n") 
-            job_status = {}
-            for l in lines[2:]:                    
-                vals = l.split()
-                if len(vals)<3:
-                    continue
-                job_status[vals[0]] = {'status':vals[4]}
-
-            to_remove = []
-            for (k,p) in self.processes.items():
-
-                if p["JOB_ID"] not in job_status.keys():
-                    # we expire the job if longer than 5 minutes
-                    if time.time() - p["JOB_ID"]["start"] > 5*60:
-                        job_status[p["JOB_ID"]] = {'status':'C'}
-                    else:
-                        continue
-
-                if job_status[p["JOB_ID"]]['status'] == 'C':
-                    console.log("job {} finished".format(p["job"].uid))   
-                    to_remove.append(k)
-
-            for k in to_remove:
-                del self.processes[k]
-                controller.add_completed( p["job"] )
-                 
-            await asyncio.sleep(2)
-
-
-EXECUTORS = {    
-    "local" : CommandRunner,
-    "hpc" : HpcRunner,
-}
+    set_main_maestro(Controller(conf))
+    if conf.debug:
+        asyncio.get_event_loop().set_debug(True)

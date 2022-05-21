@@ -36,11 +36,13 @@ class Task:
             self.start()
         return self.fut.__await__()
 
-    def start(self):
+    def start(self, send=True):
         self.running = True
         self.hash = hashlib.md5("".join(self.get_command()).encode()).hexdigest()
 
-        get_main_maestro().add(self)
+        if send:
+            get_main_maestro().add(self)
+
         return(self)
 
     def result(self, return_file):
@@ -83,3 +85,15 @@ class Task:
 
     def get_command(self):
         return self.cmd
+
+    def set_prop(self,name,value):
+        self.props[name]=value
+
+    def get_prop(self,name):
+        return(self.props[name])
+
+    def get_outputs(self):
+        if self.output_file=="":
+            return([])
+
+        return([self.output_file])
