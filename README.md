@@ -48,6 +48,7 @@ The status is very experimental. I will likely be changing the interface as I go
    - [ ] controller could parse the log file for results (looking for specific triggers)
    - [ ] allow for glob output/input
    - [ ] provide simple toml/json interface for simple tasks and flows
+   - [ ] use `shlex` to parse command from strings
  - cli
    - [ ] pass arguments to flows 
    - [ ] create portable executable
@@ -131,3 +132,9 @@ poetry install
 cd examples/simple-local
 poetry run scriptflow run sleepit
 ```
+
+### Docker images to try the different schedulers
+
+ - [PBS](https://openpbs.atlassian.net/wiki/spaces/PBSPro/pages/79298561/Using+Docker+to+Instantiate+PBS)
+ - [slurm](https://medium.com/analytics-vidhya/slurm-cluster-with-docker-9f242deee601)
+=======

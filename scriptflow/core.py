@@ -73,9 +73,10 @@ class Controller:
 
         # check if the task is up to date, 
         # this allows to skip the task right away!
-        if self.check_task_uptodate(task):
-            self.complete_task(task)
-            return
+        # if self.check_task_uptodate(task):
+        #     self.complete_task(task)
+        #     return
+        # -> this is done at the time the task is send to the executor
 
         # otherwise, we add the task to the queue
         self.task_queue.put(task)
@@ -122,6 +123,12 @@ class Controller:
             if exec.available_slots()>0:
                 # take the next task
                 task = self.task_queue.get()
+
+                # check if the task is up to date, 
+                # this allows to skip the task right away!
+                if self.check_task_uptodate(task):
+                    self.complete_task(task)
+                    return
 
                 # send it to the executor
                 task.props["start_time"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
