@@ -129,9 +129,18 @@ the package is managed using poetry, install poetry first then
 
 ```
 poetry install
+
+# run example
 cd examples/simple-local
 poetry run scriptflow run sleepit
+
+# run tests with coverate
+poetry run coverage run -m pytest
+poetry run coverage report -m
 ```
+
+
+
 
 ### Docker images to try the different schedulers
 

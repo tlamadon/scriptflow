@@ -21,7 +21,7 @@ class Task:
 
     def __init__(self, cmd):
         self.fut = asyncio.get_event_loop().create_future()
-        self.running = False
+        self.state = "init"
         self.task = None
         self.cmd = cmd
         self.deps = []
@@ -37,7 +37,7 @@ class Task:
         return self.fut.__await__()
 
     def start(self, send=True):
-        self.running = True
+        self.state = "queued"
         self.hash = hashlib.md5("".join(self.get_command()).encode()).hexdigest()
 
         if send:
@@ -97,3 +97,12 @@ class Task:
             return([])
 
         return([self.output_file])
+
+    def set_state_scheduled(self):
+        self.state = "scheduled"
+
+    def set_state_completed(self):
+        self.state = "completed"
+
+    def set_completed(self):
+        self.fut.set_result(self)

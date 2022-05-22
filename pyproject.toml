@@ -18,6 +18,7 @@ pytest = "^7.1.1"
 omegaconf = "^2.1.1"
 
 [tool.poetry.dev-dependencies]
+coverage = "^6.3.3"
 
 [tool.poetry.scripts]
 scriptflow = 'scriptflow.cli:cli'

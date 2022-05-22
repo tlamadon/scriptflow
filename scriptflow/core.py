@@ -184,7 +184,7 @@ class Controller:
         # mark the promise as completed and set it to itself
         assert asyncio.isfuture(task.fut)
         assert not task.fut.done()
-        task.fut.set_result(task)
+        task.set_completed()
 
     def update_history(self, task):
         # append job to history - replace this with upsert

@@ -50,18 +50,20 @@ class TestController(IsolatedAsyncioTestCase):
         # next we call update on the controller
         # the controller should check inputs/ouputs
         controller.update()
+        controller.update()
 
         # at this point the runner should have assigned the task
-        runner.add.assert_called_once()
+        runner.add.assert_called()
 
         # we then call complete on the task
         controller.add_completed(task1)
 
+        # check that task was completed
+        task1.set_completed.assert_called()
+        task2.set_completed.assert_not_called()
 
-
-
-
-
+        controller.add_completed(task2)
+        task2.set_completed.assert_called()
 
         
 
