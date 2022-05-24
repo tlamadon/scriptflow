@@ -137,6 +137,8 @@ poetry run scriptflow run sleepit
 # run tests with coverate
 poetry run coverage run -m pytest
 poetry run coverage report -m
+
+poetry run python -m unittest tests.test_controller
 ```
 
 

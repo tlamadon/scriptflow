@@ -70,6 +70,9 @@ class Controller:
         self.notifty_hash = conf.get('notify',None)
         self.fs = FileSystem()
 
+        self.shut_me_down = False
+        self.loop = None
+
         self.msg_queue = queue.Queue()
 
         # we take teh runner if passed (mostly for testing)
@@ -232,6 +235,15 @@ class Controller:
 
                 await asyncio.sleep(0.1)
 
+    async def update_loop(self):
+        while self.shut_me_down==False:
+            self.update()
+            await asyncio.sleep(0.1)
+
+    async def shutdown(self):
+        self.shut_me_down = True
+        await self.loop
+
     def log(self, str):
         self.msg_queue.put(str)
 
@@ -262,6 +274,6 @@ def init(dict):
 
     logging.basicConfig(filename='scriptflow.log', level=logging.DEBUG)
 
-    set_main_maestro(Controller(conf))
+    set_main_controller(Controller(conf))
     if conf.debug:
         asyncio.get_event_loop().set_debug(True)

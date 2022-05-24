@@ -2,7 +2,7 @@
 import hashlib
 import asyncio
 
-from .glob import get_main_maestro
+from .glob import get_main_controller
 
 
 """
@@ -19,11 +19,22 @@ class Task:
     ncore="10"
     retry=0
 
-    def __init__(self, cmd):
+    """
+    Allows to construct the class with several options!
+    """
+    def __init__(self, **kwargs):
+
         self.fut = asyncio.get_event_loop().create_future()
         self.state = "init"
-        self.task = None
-        self.cmd = cmd
+
+        if "cmd" in kwargs.keys():
+            self.cmd  = kwargs["cmd"]
+
+        if "controller" in kwargs.keys():
+            self.controller  = kwargs["controller"]
+        else:
+            self.controller = get_main_controller()
+
         self.deps = []
         self.output_file = ""
         self.quiet = True
@@ -32,17 +43,16 @@ class Task:
         self.props = {}
 
     def __await__(self):
-        if self.task is None:
-            self.start()
+        # we need to check if the task has been scheduled
+        if not self.is_scheduled():
+            self.schedule()
+
         return self.fut.__await__()
 
-    def start(self, send=True):
-        self.state = "queued"
+    def schedule(self):
+        self.state = "scheduled"
         self.hash = hashlib.md5("".join(self.get_command()).encode()).hexdigest()
-
-        if send:
-            get_main_maestro().add(self)
-
+        self.controller.add(self)
         return(self)
 
     def result(self, return_file):
@@ -100,6 +110,9 @@ class Task:
 
     def set_state_scheduled(self):
         self.state = "scheduled"
+
+    def is_scheduled(self):
+        return(self.state == "scheduled")
 
     def set_state_completed(self):
         self.state = "completed"
