@@ -15,6 +15,7 @@ import queue
 import subprocess
 from datetime import datetime
 from omegaconf import OmegaConf
+import os, tempfile
 
 class AbstractRunner(ABC):
 
@@ -101,6 +102,7 @@ class HpcRunner(AbstractRunner):
     """
 
     def __init__(self, conf):
+        conf = OmegaConf.create(conf)
         self.max_proc = conf.maxsize
         self.processes = {}
         self.job_params = {'procs':1, 'mem' : "16Gb", 'name':'psub'}
