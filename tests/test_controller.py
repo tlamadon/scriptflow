@@ -64,34 +64,6 @@ class TestController(IsolatedAsyncioTestCase):
 
         controller.add_completed(task2)
         task2.set_completed.assert_called()
-   
-
-class MinimalExample(asynctest.TestCase):
-    
-    async def controller_loop(self):
-         while True:
-            # check tasks
-            self.controller.update()
-            await asyncio.sleep(0.1)
-
-    async def setUp(self):
-        self.runner = Mock(**{
-            'available_slots.return_value' : 1})
-        self.controller = sf.core.Controller(runner=self.runner)
-
-        # start the loops for the controller
-        asyncio.create_task(self.controller_loop())
-
-    async def test_that_true_is_true(self):
-
-        t1 = sf.Task(
-                cmd="blafdafds",
-                controller = self.controller)
-        
-        t1.schedule()
-        self.controller.add_completed(t1)
-
-        await t1
 
 if __name__ == '__main__':
     unittest.main()

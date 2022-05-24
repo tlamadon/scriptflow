@@ -1,6 +1,6 @@
 # scriptflow
 
-[![CircleCI](https://circleci.com/gh/tlamadon/scriptflow/tree/main.svg?style=svg)](https://circleci.com/gh/tlamadon/scriptflow/tree/main) [![PyPI version](https://badge.fury.io/py/scriptflow.svg)](https://badge.fury.io/py/scriptflow)
+[![CircleCI](https://circleci.com/gh/tlamadon/scriptflow/tree/main.svg?style=svg)](https://circleci.com/gh/tlamadon/scriptflow/tree/main) [![PyPI version](https://badge.fury.io/py/scriptflow.svg)](https://badge.fury.io/py/scriptflow) [![codecov](https://codecov.io/gh/tlamadon/scriptflow/branch/main/graph/badge.svg?token=0E8J7635HD)](https://codecov.io/gh/tlamadon/scriptflow)
 
 Small library that allows scheduling scripts asyncrhonously on different platforms. Think of it as a Make when you can write the dependencies as python code, and that can run locally, on an HPC or in the cloud (cloud is not implemented just yet).
 
@@ -135,10 +135,10 @@ cd examples/simple-local
 poetry run scriptflow run sleepit
 
 # run tests with coverate
-poetry run coverage run -m pytest
-poetry run coverage report -m
+poetry run python -m pytest --cov=scriptflow
+poetry run coverage xml
+poetry run codecov -t <token>
 
-poetry run python -m unittest tests.test_controller
 ```
 
 
