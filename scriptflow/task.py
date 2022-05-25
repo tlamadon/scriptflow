@@ -25,7 +25,7 @@ class Task:
     """
     def __init__(self, **kwargs):
 
-        self.fut = asyncio.get_event_loop().create_future()
+        self.fut = None
         self.state = "init"
 
         if "cmd" in kwargs.keys():
@@ -40,8 +40,24 @@ class Task:
         else:
             self.controller = get_main_controller()
 
+        if "outputs" in kwargs.keys():
+            self.output_file  = kwargs["outputs"]
+        else:
+            self.output_file = ""
+
+        if "inputs" in kwargs.keys():
+            self.deps  = kwargs["inputs"]
+            if isinstance(kwargs["inputs"], str):
+                self.deps = [kwargs["inputs"]]
+            else:
+                self.deps  = kwargs["inputs"]
+
+        if "name" in kwargs.keys():
+            self.name  = kwargs["name"]
+        else:
+            self.name = ""
+
         self.deps = []
-        self.output_file = ""
         self.quiet = True
         self.hash = ""
         self.return_file = ""
@@ -55,6 +71,7 @@ class Task:
         return self.fut.__await__()
 
     def schedule(self):
+        self.fut = asyncio.get_event_loop().create_future()
         self.state = "scheduled"
         self.hash = hashlib.md5("".join(self.get_command()).encode()).hexdigest()
         self.controller.add(self)

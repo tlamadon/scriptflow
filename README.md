@@ -38,7 +38,7 @@ The status is very experimental. I will likely be changing the interface as I go
    - [ ] input and output hashes
    - [x] start and end datetimes
  - notification system
-   - [ ] allow to sned messages
+   - [x] allow to send messages
    - [ ] allow for runs
    - [ ] allow to send messages with html content like images
  - writing tasks and flows 
@@ -48,7 +48,7 @@ The status is very experimental. I will likely be changing the interface as I go
    - [ ] controller could parse the log file for results (looking for specific triggers)
    - [ ] allow for glob output/input
    - [ ] provide simple toml/json interface for simple tasks and flows
-   - [ ] use `shlex` to parse command from strings
+   - [x] use `shlex` to parse command from strings
  - cli
    - [ ] pass arguments to flows 
    - [ ] create portable executable
@@ -71,7 +71,8 @@ sf.init({
     'debug':True
 })
 
-def combine_file():
+# example of a simple step that combines outcomes
+def step2_combine_file():
     with open('test_1.txt') as f:
         a = int(f.readlines()[0])
     with open('test_2.txt') as f:
@@ -83,16 +84,20 @@ def combine_file():
 async def flow_sleepit():
 
     i=1
-    t1 = sf.Task(f"""python -c "import time; time.sleep(5); open('test_{i}.txt','w').write('5');" """)
-    t1.output(f"test_{i}.txt").uid(f"solve-{i}")
+    t1 = sf.Task(
+      cmd    = f"""python -c "import time; time.sleep(5); open('test_{i}.txt','w').write('5');" """,
+      output = f"test_{i}.txt",
+      name   = f"solve-{i}")
 
     i=2
-    t2 = sf.Task(["python", "-c", f"import time; time.sleep(5); open('test_{i}.txt','w').write('4');"])
-    t2.output(f"test_{i}.txt").uid(f"solve-{i}")
+    t1 = sf.Task(
+      cmd    = f"""python -c "import time; time.sleep(5); open('test_{i}.txt','w').write('5');" """,
+      output = f"test_{i}.txt",
+      name   = f"solve-{i}")
 
     await sf.bag(t1,t2)
 
-    tfinal = sf.Task(["python", "-c", "import sflow; sflow.combine_file()"])
+    tfinal = sf.Task("python -c 'import sflow; sflow.step2_combine_file()'")
     tfinal.output(f"final.txt").uid(f"final").add_deps([t1.output_file,t2.output_file])
     await tfinal
 ```        

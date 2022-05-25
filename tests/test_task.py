@@ -21,13 +21,13 @@ async def controller(event_loop):
     await controller.shutdown()   
 
 @pytest.mark.asyncio
-async def test_example(controller):
+async def test_tasks(controller):
     """No marker!"""
 
     t1 = sf.Task(cmd="test", controller=controller)
     t2 = sf.Task(cmd="test", controller=controller)
-    controller.add(t1)
-    controller.add(t2)
+    t1.schedule()
+    t2.schedule()
 
     assert t1.fut.done()==False
     assert t2.fut.done()==False
@@ -40,12 +40,11 @@ async def test_example(controller):
     assert t2.fut.done()==True
 
     t3 = sf.Task(cmd="test", controller=controller)
-    controller.add(t3)
+    t3.schedule()
     controller.complete_task(t3)
     assert t3.fut.done()==True
     await t3
 
-    controller.add(t3)
     with pytest.raises(Exception):
         controller.complete_task(t3)
 
