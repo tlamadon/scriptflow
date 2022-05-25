@@ -16,6 +16,7 @@ import subprocess
 from datetime import datetime
 from omegaconf import OmegaConf
 import os, tempfile
+import time
 
 class AbstractRunner(ABC):
 
@@ -133,43 +134,44 @@ class HpcRunner(AbstractRunner):
             output = subprocess.check_output(command).decode()
             JOB_ID = output.replace("\n","")
             
-            self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"S"}          
+            self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"S", 'start':time.time()}          
         except subprocess.CalledProcessError as e:
-            self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"F"}          
+            self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"F", 'start':time.time()}          
+
+    def update(self, controller):
+
+        # checking job status
+        output = subprocess.check_output("qstat").decode()
+        lines = output.split("\n") 
+        job_status = {}
+        for l in lines[2:]:                    
+            vals = l.split()
+            if len(vals)<3:
+                continue
+            job_status[vals[0]] = {'status':vals[4]}
+
+        to_remove = []
+        for (k,p) in self.processes.items():
+
+            if p["JOB_ID"] not in job_status.keys():
+
+                # we expire the job if longer than 5 minutes
+                if time.time() - p["start"] > 5*60:
+                    job_status[p["JOB_ID"]] = {'status':'C'}
+                else:
+                    continue
+
+            if job_status[p["JOB_ID"]]['status'] == 'C':
+                to_remove.append(k)
+
+        for k in to_remove:
+            del self.processes[k]
+            controller.add_completed( p["job"] )
 
     async def loop(self,controller):
         while True:
-            
-            # checking job status
-            output = subprocess.check_output("qstat").decode()
-            lines = output.split("\n") 
-            job_status = {}
-            for l in lines[2:]:                    
-                vals = l.split()
-                if len(vals)<3:
-                    continue
-                job_status[vals[0]] = {'status':vals[4]}
-
-            to_remove = []
-            for (k,p) in self.processes.items():
-
-                if p["JOB_ID"] not in job_status.keys():
-                    # we expire the job if longer than 5 minutes
-                    if time.time() - p["JOB_ID"]["start"] > 5*60:
-                        job_status[p["JOB_ID"]] = {'status':'C'}
-                    else:
-                        continue
-
-                if job_status[p["JOB_ID"]]['status'] == 'C':
-                    console.log("job {} finished".format(p["job"].uid))   
-                    to_remove.append(k)
-
-            for k in to_remove:
-                del self.processes[k]
-                controller.add_completed( p["job"] )
-                 
+            self.update(controller)                 
             await asyncio.sleep(2)
-
 
 EXECUTORS = {    
     "local" : CommandRunner,

@@ -16,26 +16,37 @@ import subprocess
 
 # custom class to be the mock return value
 # will override the requests.Response returned from requests.get
-class MockResponse:
 
-    # mock json() method always returns a specific testing dictionary
-    @staticmethod
-    def decode():
-        return {"mock_key": "mock_response"}
+@pytest.mark.asyncio
+async def test_runner(monkeypatch):
 
-def test_runner(monkeypatch):
+    sub_process = Mock(**{
+        'decode.return_value' :"job-id-1\n"
+        })
 
-    # Any arguments may be passed and mock_get() will always return our
-    # mocked object, which only has the .json() method.
-    def mock_get(*args, **kwargs):
-        return MockResponse()
-
-    # apply the monkeypatch for requests.get to mock_get
-    monkeypatch.setattr(subprocess, "check_output", mock_get)
+    # apply the monkeypatch for subprocess.checkoutput.decode() to mock_get
+    monkeypatch.setattr(subprocess, "check_output", Mock(return_value = sub_process))
 
     runner = sf.HpcRunner({'maxsize':5})
     t1 = sf.Task(cmd="test")
     runner.add(t1)
 
-    result = subprocess.check_output("basdasd").decode()
-    assert result["mock_key"] == "mock_response"
+    controller = Mock(**{
+            'available_slots.return_value' : 1})
+
+    print(runner.processes)
+
+    sub_process = Mock(**{
+        'decode.return_value' :"""\n\njob-id-1 c1 c2 c3 Q\n"""
+        })
+    monkeypatch.setattr(subprocess, "check_output", Mock(return_value = sub_process))
+    controller.add_completed.assert_not_called()
+
+    sub_process = Mock(**{
+        'decode.return_value' :"""\n\njob-id-1 c1 c2 c3 C\n"""
+        })
+    monkeypatch.setattr(subprocess, "check_output", Mock(return_value = sub_process))
+
+    # call update on the runner
+    runner.update(controller)
+    controller.add_completed.assert_called()
