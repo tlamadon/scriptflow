@@ -47,3 +47,20 @@ async def test_example(controller):
     controller.add(t3)
     with pytest.raises(Exception):
         controller.complete_task(t3)
+
+    t4 = sf.Task(cmd="test", controller=controller)
+    t4.schedule()
+    assert t4.is_scheduled()
+
+    t5 = sf.Task(cmd="test", controller=controller)
+    t5.set_prop("test","test")
+    assert t5.get_prop("test")=="test"
+
+    t5.add_deps("dep1.txt")
+    t5.add_deps(["dep2.txt","dep3,txt"])
+    assert len(t5.deps)==3
+
+    t5.output("output.txt")
+    assert t5.get_outputs() == ["output.txt"]
+
+    t5.uid("myuid")
