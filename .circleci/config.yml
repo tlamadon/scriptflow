@@ -41,9 +41,9 @@ jobs:
           name: Run Pytest
           no_output_timeout: 20m
           command: |
-            poetry run python -m pytest 
-
-
+            poetry run python -m pytest --cov=scriptflow
+            poetry run coverage xml
+            poetry run codecov -t $CODECOV_TOKEN
 
 
 # In the workflows section, we specify when we want to run the jobs defined
