@@ -1,6 +1,7 @@
 
 import hashlib
 import asyncio
+import shlex
 
 from .glob import get_main_controller
 
@@ -28,7 +29,11 @@ class Task:
         self.state = "init"
 
         if "cmd" in kwargs.keys():
-            self.cmd  = kwargs["cmd"]
+            # we check if we have a string, in which case we try to split it
+            if isinstance(kwargs["cmd"], str):
+                self.cmd = shlex.split(kwargs["cmd"])
+            else:
+                self.cmd  = kwargs["cmd"]
 
         if "controller" in kwargs.keys():
             self.controller  = kwargs["controller"]

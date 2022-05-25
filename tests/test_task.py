@@ -43,6 +43,7 @@ async def test_example(controller):
     controller.add(t3)
     controller.complete_task(t3)
     assert t3.fut.done()==True
+    await t3
 
     controller.add(t3)
     with pytest.raises(Exception):
@@ -64,3 +65,24 @@ async def test_example(controller):
     assert t5.get_outputs() == ["output.txt"]
 
     t5.uid("myuid")
+
+@pytest.mark.asyncio
+async def test_task_cmd(controller):
+
+    t1 = sf.Task(cmd="python somefile.py", controller=controller)
+    assert t1.get_command() == ["python","somefile.py"]
+
+    t1 = sf.Task(cmd="python", controller=controller)
+    assert t1.get_command() == ["python"]
+
+    t1 = sf.Task(cmd="python 'two word.txt'", controller=controller)
+    assert t1.get_command() == ["python",'two word.txt']
+
+    i=10
+    t1 = sf.Task(cmd=f"""python -c "import time; time.sleep(5); open('test_{i}.txt','w').write('5');" """)
+    assert t1.get_command() == ["python",'-c',"import time; time.sleep(5); open('test_10.txt','w').write('5');"]
+
+    assert t1.get_outputs() == []
+
+    t1.set_state_completed()
+    t1.set_state_scheduled()

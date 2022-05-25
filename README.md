@@ -83,7 +83,7 @@ def combine_file():
 async def flow_sleepit():
 
     i=1
-    t1 = sf.Task(["python", "-c", f"import time; time.sleep(5); open('test_{i}.txt','w').write('5');"])
+    t1 = sf.Task(f"""python -c "import time; time.sleep(5); open('test_{i}.txt','w').write('5');" """)
     t1.output(f"test_{i}.txt").uid(f"solve-{i}")
 
     i=2
