@@ -20,12 +20,17 @@ import subprocess
 @pytest.mark.asyncio
 async def test_runner(monkeypatch):
 
-    sub_process = Mock(**{
-        'decode.return_value' :"job-id-1\n"
+    def subprocess_return(arg):
+        print("argument= {}".format(arg))
+        return Mock(**{
+            'decode.return_value' :"job-id-1\n"
         })
 
     # apply the monkeypatch for subprocess.checkoutput.decode() to mock_get
-    monkeypatch.setattr(subprocess, "check_output", Mock(return_value = sub_process))
+    monkeypatch.setattr(
+        subprocess, 
+        "check_output", 
+        Mock(side_effect = subprocess_return))
 
     runner = sf.HpcRunner({'maxsize':5})
     t1 = sf.Task(cmd="test")
@@ -38,8 +43,9 @@ async def test_runner(monkeypatch):
 
     sub_process = Mock(**{
         'decode.return_value' :"""\n\njob-id-1 c1 c2 c3 Q\n"""
-        })
+        })        
     monkeypatch.setattr(subprocess, "check_output", Mock(return_value = sub_process))
+    
     controller.add_completed.assert_not_called()
 
     sub_process = Mock(**{
