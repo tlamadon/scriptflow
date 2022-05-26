@@ -63,8 +63,6 @@ async def test_tasks(controller):
     t5.output("output.txt")
     assert t5.get_outputs() == ["output.txt"]
 
-    t5.uid("myuid")
-
 @pytest.mark.asyncio
 async def test_task_cmd(controller):
 
