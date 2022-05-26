@@ -35,21 +35,30 @@ def compare_file():
 async def flow_sleepit():
 
     i=1
-    t1 = sf.Task(["python", "-c", f"import time; time.sleep(5); open('test_{i}.txt','w').write('5');"])
-    t1.output(f"test_{i}.txt").uid(f"solve-{i}")
+    t1 = sf.Task(
+        cmd = f"""python -c "import time; time.sleep(2); open('test_{i}.txt','w').write('5');" """,
+        outputs = f"test_{i}.txt",
+        name = f"solve-{i}")
 
     i=2
-    t2 = sf.Task(["python", "-c", f"import time; time.sleep(5); open('test_{i}.txt','w').write('4');"])
-    t2.output(f"test_{i}.txt").uid(f"solve-{i}")
+    t2 = sf.Task(
+        cmd = f"""python -c "import time; time.sleep(2); open('test_{i}.txt','w').write('5');" """,
+        outputs = f"test_{i}.txt",
+        name = f"solve-{i}")
 
     await sf.bag(t1,t2)
 
-    tfinal = sf.Task(["python", "-c", "import sflow; sflow.compare_file()"])
-    tfinal.output(f"final.txt").uid(f"final").add_deps([t1.output_file,t2.output_file])
+    tfinal = sf.Task(
+        cmd = f"""python -c "import sflow; sflow.compare_file()" """,
+        outputs = "final.txt",
+        name = "final",
+        inputs = [t1.output_file, t2.output_file])
+
     await tfinal
 
-    tasks = [sf.Task(["python", "-c", f"import time; time.sleep(5); open('test_{i}.txt','w').write('4');"]).uid(f"test_{i}").output(f"test_{i}.txt") for i in range(10,20)]
-    await sf.bag(*tasks)
+    # tasks = [ sf.Task(
+    #     ["python", "-c", f"import time; time.sleep(5); open('test_{i}.txt','w').write('4');"]).uid(f"test_{i}").output(f"test_{i}.txt") for i in range(10,20)]
+    # await sf.bag(*tasks)
 
 
 

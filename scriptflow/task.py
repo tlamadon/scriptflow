@@ -51,13 +51,14 @@ class Task:
                 self.deps = [kwargs["inputs"]]
             else:
                 self.deps  = kwargs["inputs"]
+        else:
+            self.deps=[]
 
         if "name" in kwargs.keys():
-            self.name  = kwargs["name"]
+            self.uid  = kwargs["name"]
         else:
-            self.name = ""
+            self.uid = ""
 
-        self.deps = []
         self.quiet = True
         self.hash = ""
         self.return_file = ""

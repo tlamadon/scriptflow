@@ -15,6 +15,7 @@ def load_local_file(filename):
     spec = importlib.util.spec_from_file_location("", os.getcwd() + "/" + filename)
     foo = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(foo)
+    return foo
 
 """
     Main
@@ -37,9 +38,10 @@ def cli():
 
 @cli.command()
 @click.argument('name')
-def run(name="",load="sflow.py"):
+@click.option('-f', '--force', 'force')
+def run(name="",force=None,load="sflow.py"):
 
-    load_local_file("sflow.py")
+    foo = load_local_file("sflow.py")
 
     func_names = {k:v for (k,v) in getmembers(foo, isfunction)}
     flows = [w.replace("flow_","") for w in func_names.keys() if w.startswith("flow_")]
@@ -51,6 +53,8 @@ def run(name="",load="sflow.py"):
     func = func_names["flow_{}".format(name)]
 
     controller = get_main_controller()
+    controller.set_force_string(force)
+    
     asyncio.run(main(func, controller))
 
 # if __name__ == '__main__':

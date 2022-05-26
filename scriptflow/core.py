@@ -11,6 +11,8 @@ import asyncio
 import logging
 import queue
 import requests
+import shlex
+import fnmatch
 
 from rich.console import Console
 from time import sleep
@@ -69,6 +71,7 @@ class Controller:
         self.last_notify = ""
         self.notifty_hash = conf.get('notify',None)
         self.fs = FileSystem()
+        self.force_string = conf.get('force',None)
 
         self.shut_me_down = False
         self.loop = None
@@ -157,6 +160,12 @@ class Controller:
     Check if the task is up to date 
     """
     def check_task_uptodate(self, task):
+
+        # add a test to run if matches regexp (this is to force rerun at least once)
+        if (self.force_string is not None) and (fnmatch.fnmatch(task.uid, self.force_string)):
+            self.log(f"adding forced [red]{task.uid}[/red]")
+            self.log(" - cmd: {}".format( " ".join(task.get_command() ) ))
+            return(False)
 
         # checking if the task needs to be redone
         if os.path.exists(task.output_file):
@@ -268,6 +277,8 @@ class Controller:
         console.log("You ran {} tasks with {} fails.".format(self.done, self.failed))
         console.log("--------------------------------")
 
+    def set_force_string(self,str):
+        self.force_string = str
 
 def init(dict):    
     conf = OmegaConf.create(dict)
