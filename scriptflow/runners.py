@@ -106,7 +106,7 @@ class HpcRunner(AbstractRunner):
         conf = OmegaConf.create(conf)
         self.max_proc = conf.maxsize
         self.processes = {}
-        self.job_params = {'procs':1, 'mem' : "16", 'name':'psub'}
+        self.job_params = {'procs':1, 'mem' : 16, 'name':'psub'}
 
     def size(self):
         return(len(self.processes))
@@ -254,15 +254,6 @@ cd {wd}
             if len(vals)<3:
                 continue
             job_status[vals[0]] = {'status':vals[4]}
-
-        # to_remove = []
-        # for (k,p) in self.processes.items():
-        #     if p["JOB_ID"] not in job_status.keys():
-        #         to_remove.append(k)
-
-        # for k in to_remove:
-        #     del self.processes[k]
-        #     controller.add_completed( p["job"] )
 
         to_remove = []
         for (k,p) in self.processes.items():

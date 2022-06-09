@@ -14,7 +14,7 @@ sf.init({
         "slurm":{
             "maxsize": 2,
             "account": 'pi-chansen1',
-            "partition": 'gpu',
+            "partition": 'standard',
             "modules": 'R/3.6/3.6.2',
             "walltime": '00:01:00'
         } 
@@ -31,12 +31,12 @@ if not os.path.exists(temp_dir):
 # define a flow called Rit
 async def flow_Rit():
 
-    # Generates 10 simulation draws from a bivariate normal and stores as .csv
+    # Generates 5 simulation draws from a bivariate normal and stores as .csv
     tasks = [
         sf.Task(
-        cmd = f"""R --vanilla  '--args {i} {temp_dir}' < gen_results.R""",
+        cmd = f"R --vanilla  '--args {i} {temp_dir}' < gen_results.R",
         outputs = f"{temp_dir}/res_{i}.RData",
-        name = f"sim-{i}")
+        name = f"sim-{i}").set_retry(2)
         for i in range(5)
     ]
 

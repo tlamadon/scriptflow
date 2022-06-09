@@ -86,7 +86,7 @@ class Task:
         self.output_file = output_file    
         return self     
 
-    def setretry(self, retry): # ERROR CAUSED IF NAMED retry ONLY
+    def set_retry(self, retry):
         self.retry = retry    
         return self     
 
