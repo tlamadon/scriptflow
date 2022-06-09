@@ -93,7 +93,7 @@ class HpcRunner(AbstractRunner):
     #PBS -N {name}
     #PBS -j oe
     #PBS -V
-    #PBS -l procs={procs},mem={mem}
+    #PBS -l procs={procs},mem={mem}Gb
     #PBS -l walltime=12:00:00
 
     module load julia/1.6.1
@@ -106,7 +106,7 @@ class HpcRunner(AbstractRunner):
         conf = OmegaConf.create(conf)
         self.max_proc = conf.maxsize
         self.processes = {}
-        self.job_params = {'procs':1, 'mem' : "16Gb", 'name':'psub'}
+        self.job_params = {'procs':1, 'mem' : "16", 'name':'psub'}
 
     def size(self):
         return(len(self.processes))
@@ -173,7 +173,113 @@ class HpcRunner(AbstractRunner):
             self.update(controller)                 
             await asyncio.sleep(2)
 
+class HpcRunner_slurm(AbstractRunner):
+
+    script_template = """\
+#!/bin/bash
+
+#SBATCH --account={account} # phd, pi-[faculty], etc.
+#SBATCH --partition={partion} # standard, gpu, etc.
+#SBATCH --mem-per-cpu={mem}G
+#SBATCH --cpus-per-task={ncore} 
+#SBATCH --time=0-{walltime} # wall clock limit (d-hh:mm:ss)
+#SBATCH --job-name={name} # user-defined job name
+
+# Print some variables to log file
+echo "Job ID: $SLURM_JOB_ID"
+echo "Job User: $SLURM_JOB_USER"
+echo "Job Name: $SLURM_JOB_NAME"
+echo "CPUs per Node: $SLURM_JOB_CPUS_PER_NODE"
+echo "Memory per CPU: $SLURM_MEM_PER_CPU"
+
+module load {modules}
+cd {wd}
+
+{cmd}
+    """
+
+    def __init__(self, conf):
+        conf = OmegaConf.create(conf)
+        self.max_proc = conf.maxsize
+        self.processes = {}
+        self.account = conf.account
+        self.partition = conf.partition
+        self.modules = conf.modules
+        self.walltime = conf.walltime
+
+        # create log-directory
+        if not os.path.exists("log"):
+            os.mkdir("log")
+
+    def size(self):
+        return(len(self.processes))
+
+    def available_slots(self):
+        return self.max_proc - len(self.processes)
+
+    def add(self, task):
+
+        # create the script
+        script_content = self.script_template.format(
+                        name = "{}".format(task.uid),
+                        mem = task.mem,
+                        ncore = task.ncore,
+                        wd = os.getcwd(), 
+                        cmd = " ".join(task.get_command()),
+                        account = self.account,
+                        partion = self.partition,
+                        modules = self.modules,
+                        walltime = self.walltime)
+
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.sh')
+        tmp_script_filename = tmp.name
+        tmp.write(script_content.encode())
+        tmp.close()
+
+        command = ["sbatch", "-o", f"log/sf-{task.uid}.out", tmp_script_filename]
+        try:
+            output = subprocess.check_output(command).decode()
+            JOB_ID = output.replace("\n","").split(' ')[3]
+            self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"S"}          
+        except subprocess.CalledProcessError as e:
+            self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"F"}
+
+    def update(self, controller):
+        # checking job status
+        output = subprocess.check_output("squeue").decode()
+        lines = output.split("\n") 
+        job_status = {}
+        for l in lines[2:]:                    
+            vals = l.split()
+            if len(vals)<3:
+                continue
+            job_status[vals[0]] = {'status':vals[4]}
+
+        # to_remove = []
+        # for (k,p) in self.processes.items():
+        #     if p["JOB_ID"] not in job_status.keys():
+        #         to_remove.append(k)
+
+        # for k in to_remove:
+        #     del self.processes[k]
+        #     controller.add_completed( p["job"] )
+
+        to_remove = []
+        for (k,p) in self.processes.items():
+            if p["JOB_ID"] not in job_status.keys():
+                to_remove.append((k,p))
+
+        for (k,p) in to_remove:
+            del self.processes[k]
+            controller.add_completed( p["job"] )
+
+    async def loop(self,controller):
+        while True:
+            self.update(controller)                 
+            await asyncio.sleep(2) 
+
 EXECUTORS = {    
     "local" : CommandRunner,
     "hpc" : HpcRunner,
+    "slurm": HpcRunner_slurm,
 }

@@ -16,8 +16,8 @@ note:
 class Task:
     cmd =""
     uid=""
-    mem="32Gb"
-    ncore="10"
+    mem="1"
+    ncore="1"
     retry=0
 
     """
@@ -86,7 +86,7 @@ class Task:
         self.output_file = output_file    
         return self     
 
-    def retry(self, retry):
+    def setretry(self, retry): # ERROR CAUSED IF NAMED retry ONLY
         self.retry = retry    
         return self     
 
