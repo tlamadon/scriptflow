@@ -29,8 +29,8 @@ Solution: store all files references in output as a dictionary, files without a 
 class Task:
     cmd =""
     uid=""
-    mem="32Gb"
-    ncore="10"
+    mem="1"
+    ncore="1"
     retry=0
 
     """
@@ -103,7 +103,7 @@ class Task:
         self.output_file = output_file    
         return self     
 
-    def retry(self, retry):
+    def set_retry(self, retry):
         self.retry = retry    
         return self     
 
