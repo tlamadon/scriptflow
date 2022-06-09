@@ -7,6 +7,7 @@ from inspect import getmembers, isfunction
 
 import scriptflow.core as sf
 import os
+import logging
 
 from .glob import get_main_controller
 
@@ -17,12 +18,22 @@ def load_local_file(filename):
     spec.loader.exec_module(foo)
     return foo
 
+def _handle_task_result(task: asyncio.Task) -> None:
+    try:
+        task.result()
+    except asyncio.CancelledError:
+        pass  # Task cancellation should not be logged as an error.
+    except Exception:  # pylint: disable=broad-except
+        logging.exception('Exception raised by task = %r', task)
+
 """
     Main
 """
-async def main(func, controller):
+async def main(func, controller:sf.Controller):
 
-    asyncio.create_task( controller.start_loops() )
+    task_controller = asyncio.create_task( controller.start_loops() )
+    task_controller.add_done_callback(_handle_task_result)
+
     os.makedirs('.sf', exist_ok=True)
 
     await func()      

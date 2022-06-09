@@ -42,6 +42,13 @@ console = Console()
 def bag(*args, **kwargs):
     return(asyncio.gather(*args, **kwargs))
 
+def _handle_task_result(task: asyncio.Task) -> None:
+    try:
+        task.result()
+    except asyncio.CancelledError:
+        pass  # Task cancellation should not be logged as an error.
+    except Exception:  # pylint: disable=broad-except
+        logging.exception('Exception raised by task = %r', task)
 
 from rich.console import Console
 from time import sleep
@@ -77,6 +84,7 @@ class Controller:
         self.loop = None
 
         self.msg_queue = queue.Queue()
+        self.logger = logging.getLogger(self.__class__.__name__)
 
         # we take teh runner if passed (mostly for testing)
         if runner is not None:
@@ -182,6 +190,8 @@ class Controller:
             if UP_TO_DATE:
                 self.log(f"task [red]{task.uid}[/red] is up to date, skipping it.")
                 return(True)
+        else:
+            self.log(f"adding [red]{task.uid}[/red] output {task.output_file} is missing")
 
         self.log(f"adding [red]{task.uid}[/red]")
         self.log(" - cmd: {}".format( " ".join(task.get_command() ) ))
@@ -217,7 +227,8 @@ class Controller:
 
     async def start_loops(self):
         for exec in self.executors.values():
-            asyncio.create_task(exec.loop(self))
+            co_task = asyncio.create_task(exec.loop(self))
+            co_task.add_done_callback(_handle_task_result)
 
         # run my own event loop
         with console.status("Running ...") as status:

@@ -6,11 +6,24 @@ import shlex
 from .glob import get_main_controller
 
 
+
+
 """
 
 note: 
  - use input and output for dependencies and generated stuff
  - use set_args and set_return for input parameters and return values that should be collected
+
+it would be nice to have the ability of having named and unamed list of inputs and ouputs, perhaps we can force
+that the list is either named or not, perhaps partitioned?
+
+all unamed:
+input=['file1', 'file2']
+
+groups:
+input={ 'anonymous' : ['file1', 'file2'], 'params' : 
+
+Solution: store all files references in output as a dictionary, files without a key get assigned to None, other get assigned to their key.
 
 """
 class Task:
@@ -59,7 +72,11 @@ class Task:
         else:
             self.uid = ""
 
-        self.quiet = True
+        if "quiet" in kwargs.keys():
+            self.quiet  = kwargs["quiet"]
+        else:
+            self.quiet = True
+
         self.hash = ""
         self.return_file = ""
         self.props = {}
