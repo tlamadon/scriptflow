@@ -79,7 +79,11 @@ class Task:
 
         self.hash = ""
         self.return_file = ""
-        self.props = {}
+
+        if "props" in kwargs.keys():
+            self.props  = kwargs["props"]
+        else:
+            self.props = {}
 
     def __await__(self):
         # we need to check if the task has been scheduled
