@@ -84,22 +84,25 @@ def step2_combine_file():
 async def flow_sleepit():
 
     i=1
-    t1 = sf.Task(
+    task1 = sf.Task(
       cmd    = f"""python -c "import time; time.sleep(5); open('test_{i}.txt','w').write('5');" """,
-      output = f"test_{i}.txt",
+      outputs = f"test_{i}.txt",
       name   = f"solve-{i}")
 
     i=2
-    t1 = sf.Task(
+    task2 = sf.Task(
       cmd    = f"""python -c "import time; time.sleep(5); open('test_{i}.txt','w').write('5');" """,
-      output = f"test_{i}.txt",
+      outputs = f"test_{i}.txt",
       name   = f"solve-{i}")
 
-    await sf.bag(t1,t2)
+    await sf.bag(task1,task2)
 
-    tfinal = sf.Task("python -c 'import sflow; sflow.step2_combine_file()'")
-    tfinal.output(f"final.txt").uid(f"final").add_deps([t1.output_file,t2.output_file])
-    await tfinal
+    task_final = sf.Task(
+      cmd = "python -c 'import sflow; sflow.step2_combine_file()'",
+      outputs = f"final.txt",
+      inputs = [*t1.get_outputs(),*t1.get_outputs()])
+
+    await task_final
 ```        
 
 then create a local env, activate, install and run!
