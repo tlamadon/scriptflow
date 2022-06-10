@@ -76,10 +76,13 @@ async def test_task_cmd(controller):
     assert t1.get_command() == ["python",'two word.txt']
 
     i=10
-    t1 = sf.Task(cmd=f"""python -c "import time; time.sleep(5); open('test_{i}.txt','w').write('5');" """)
+    t1 = sf.Task(cmd=f"""python -c "import time; time.sleep(5); open('test_{i}.txt','w').write('5');" """, controller=controller)
     assert t1.get_command() == ["python",'-c',"import time; time.sleep(5); open('test_10.txt','w').write('5');"]
 
     assert t1.get_outputs() == []
 
     t1.set_state_completed()
     t1.set_state_scheduled()
+
+    t1 = sf.Task(cmd=f"bla", props = {'mem':32}, controller=controller)
+    assert t1.get_prop('mem') == 32
