@@ -54,9 +54,17 @@ class Task:
             self.controller = get_main_controller()
 
         if "outputs" in kwargs.keys():
-            self.output_file  = kwargs["outputs"]
+            if isinstance(kwargs["outputs"], dict):
+                self.outputs  = kwargs["outputs"]
+            elif isinstance(kwargs["outputs"], list):
+                self.outputs  = { None:kwargs["outputs"] }
+            elif isinstance(kwargs["outputs"], str):
+                self.outputs  = { None:[kwargs["outputs"]] }
+            else:
+                raise TypeError
+
         else:
-            self.output_file = ""
+            self.outputs = { None : [] }
 
         if "inputs" in kwargs.keys():
             self.deps  = kwargs["inputs"]
@@ -146,11 +154,11 @@ class Task:
     def get_prop(self,name):
         return(self.props[name])
 
-    def get_outputs(self):
-        if self.output_file=="":
-            return([])
+    def get_outputs(self):             
+        return([v1 for v in self.outputs.values() for v1 in v ]   )
 
-        return([self.output_file])
+    def get_output_group(self,group):        
+        return(self.outputs[group])
 
     def set_state_scheduled(self):
         self.state = "scheduled"

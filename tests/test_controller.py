@@ -11,7 +11,7 @@ import asyncio
 def test_controller_init(event_loop):
 
     task1 = Mock(**{
-        'output_file' :"tmp.txt",
+        'outputs':{None:['tmp.txt']},
         'props' : {},
         'deps':[],
         'fut': event_loop.create_future(),
@@ -20,7 +20,7 @@ def test_controller_init(event_loop):
         'get_outputs.return_value' :  []})
 
     task2 = Mock(**{
-        'output_file' :"tmp.txt",
+        'outputs':{None:['tmp.txt']},
         'props' : {},
         'deps':[],
         'fut': event_loop.create_future(),
@@ -59,7 +59,7 @@ def test_controller_init(event_loop):
 def test_controller_retry(event_loop):
 
     task1 = Mock(**{
-        'output_file' :"tmp.txt",
+        'outputs' : {None:["tmp.txt"]},
         'props' : {},
         'deps':[],
         'retry':1,

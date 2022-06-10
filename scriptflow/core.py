@@ -176,9 +176,10 @@ class Controller:
             return(False)
 
         # checking if the task needs to be redone
-        if os.path.exists(task.output_file):
+        if len(task.get_outputs())>0 and os.path.exists( task.get_outputs()[0] ):
             # console.log("checking {}".format(j.output_file))
-            output_time = os.path.getmtime(task.output_file)  
+            output_time = os.path.getmtime(task.get_outputs()[0])  
+            # fixme, get the date of the most recent output
 
             UP_TO_DATE = True
             for f in task.deps:
@@ -216,7 +217,7 @@ class Controller:
 
         newdict = { 
             'deps' : task.deps,
-            'output' : task.output_file,
+            'output' : task.outputs,
             'cmd': task.get_command()
         }
 

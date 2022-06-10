@@ -52,7 +52,10 @@ async def test_tasks(controller):
     t4.schedule()
     assert t4.is_scheduled()
 
-    t5 = sf.Task(cmd="test", controller=controller)
+    t5 = sf.Task(
+        cmd="test", 
+        outputs = 'output.txt',
+        controller=controller)
     t5.set_prop("test","test")
     assert t5.get_prop("test")=="test"
 
@@ -60,7 +63,6 @@ async def test_tasks(controller):
     t5.add_deps(["dep2.txt","dep3,txt"])
     assert len(t5.deps)==3
 
-    t5.output("output.txt")
     assert t5.get_outputs() == ["output.txt"]
 
 @pytest.mark.asyncio
