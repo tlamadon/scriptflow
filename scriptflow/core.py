@@ -192,7 +192,7 @@ class Controller:
                 self.log(f"task [red]{task.uid}[/red] is up to date, skipping it.")
                 return(True)
         else:
-            self.log(f"adding [red]{task.uid}[/red] output {task.output_file} is missing")
+            self.log(f"adding [red]{task.uid}[/red] output {task.outputs} is missing")
 
         self.log(f"adding [red]{task.uid}[/red]")
         self.log(" - cmd: {}".format( " ".join(task.get_command() ) ))
