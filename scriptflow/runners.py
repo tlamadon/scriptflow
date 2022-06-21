@@ -162,9 +162,9 @@ class HpcRunner(AbstractRunner):
                     continue
 
             if job_status[p["JOB_ID"]]['status'] == 'C':
-                to_remove.append(k)
+                to_remove.append((k, p))
 
-        for k in to_remove:
+        for (k, p) in to_remove:
             del self.processes[k]
             controller.add_completed( p["job"] )
 

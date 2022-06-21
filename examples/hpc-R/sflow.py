@@ -8,7 +8,8 @@ Adapt hpc parameters to your specifications. Then run via the command:
 import scriptflow as sf
 import os
 
-# set main options
+# set executor to slurm or hpc 
+
 sf.init({
     "executors":{
         "slurm":{
@@ -17,6 +18,16 @@ sf.init({
             "partition": 'standard',
             "modules": 'R/3.6/3.6.2',
             "walltime": '00:01:00'
+        } 
+    },
+    'debug': True,
+    'notify': "thomas"
+})
+
+sf.init({
+    "executors":{
+        "hpc":{
+            "maxsize": 2
         } 
     },
     'debug': True,

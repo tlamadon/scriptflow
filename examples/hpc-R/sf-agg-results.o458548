@@ -1,0 +1,48 @@
+
+R version 3.6.0 (2019-04-26) -- "Planting of a Tree"
+Copyright (C) 2019 The R Foundation for Statistical Computing
+Platform: x86_64-redhat-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> # R script for aggregating simulation results.
+> 
+> # Get the arguments as a character vector
+> args = commandArgs(trailingOnly=TRUE)
+> temp_dir = args[1]
+> 
+> # Get a list of all files in the temp-directory and sum cumulatively
+> filenames <- list.files(path = temp_dir, full.names = TRUE)
+> final_res <- c(0, 0)
+> for (file in filenames) {
++     temp_res = read.csv(file)
++     final_res = final_res + temp_res 
++ }#FOR
+> 
+> # Average and store final result
+> final_res = final_res / length(filenames)
+> write.csv(final_res, file = "results.csv")
+> 
+
+#################
+Epilogue Job Info:
+Job ID: 458548.acropolis
+User ID: wiemann
+Job Name: sf-agg-results
+Resource List: procs=1,mem=1gb,walltime=12:00:00
+Resources Used: cput=00:00:00,vmem=0kb,walltime=00:00:00,mem=48900kb,energy_used=0
+Exit Code: 0
+#################
+
