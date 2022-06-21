@@ -111,8 +111,8 @@ class Task:
         self.return_file = return_file    
         return self  
 
-    def output(self, output_file):
-        self.output_file = output_file    
+    def output(self, outputs):
+        self.outputs = outputs    
         return self     
 
     def set_retry(self, retry):
