@@ -10,24 +10,26 @@ import os
 
 # set executor to slurm or hpc 
 
-sf.init({
-    "executors":{
-        "slurm":{
-            "maxsize": 2,
-            "account": 'pi-chansen1',
-            "partition": 'standard',
-            "modules": 'R/3.6/3.6.2',
-            "walltime": '00:01:00'
-        } 
-    },
-    'debug': True,
-    'notify': "thomas"
-})
+# sf.init({
+#     "executors":{
+#         "slurm":{
+#             "maxsize": 2,
+#             "account": 'pi-chansen1',
+#             "partition": 'standard',
+#             "modules": 'R/3.6/3.6.2',
+#             "walltime": '00:01:00'
+#         } 
+#     },
+#     'debug': True,
+#     'notify': "thomas"
+# })
 
 sf.init({
     "executors":{
         "hpc":{
-            "maxsize": 2
+            "maxsize": 3,
+            "modules": 'R/3.5.3',
+            "walltime": '00:01:00'
         } 
     },
     'debug': True,
@@ -55,7 +57,7 @@ async def flow_Rit():
 
     # Aggregates the simulation results and stores as .csv
     t_agg = sf.Task(
-        cmd = f"""R --vanilla  '--args {temp_dir}' < agg_results.R""",
+        cmd = f"R --vanilla  '--args {temp_dir}' < agg_results.R",
         outputs = "results.csv",
         name = "agg-results")
     

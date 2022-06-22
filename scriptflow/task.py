@@ -117,7 +117,15 @@ class Task:
 
     def set_retry(self, retry):
         self.retry = retry    
-        return self     
+        return self
+
+    def set_memory(self, mem):
+        self.mem = mem    
+        return self
+
+    def set_cpu(self, ncore):
+        self.ncore = ncore    
+        return self
 
     def input(self, input_file):
         # check that the input file actually exist and extract its values, too soon?

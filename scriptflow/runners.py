@@ -94,9 +94,9 @@ class HpcRunner(AbstractRunner):
     #PBS -j oe
     #PBS -V
     #PBS -l procs={procs},mem={mem}Gb
-    #PBS -l walltime=12:00:00
+    #PBS -l walltime={walltime}
 
-    module load julia/1.6.1
+    module load {modules}
     cd {wd}
 
     {cmd}
@@ -105,8 +105,14 @@ class HpcRunner(AbstractRunner):
     def __init__(self, conf):
         conf = OmegaConf.create(conf)
         self.max_proc = conf.maxsize
+        self.modules = conf.modules
+        self.walltime = conf.walltime
         self.processes = {}
         self.job_params = {'procs':1, 'mem' : 16, 'name':'psub'}
+
+        # create log-directory
+        if not os.path.exists("log"):
+            os.mkdir("log")
 
     def size(self):
         return(len(self.processes))
@@ -121,15 +127,17 @@ class HpcRunner(AbstractRunner):
             name = "sf-{}".format(task.uid),
             mem = task.mem,
             procs = task.ncore,
+            modules = self.modules,
+            walltime = self.walltime,
             wd = os.getcwd(), 
-            cmd = " ".join(task.get_command()) )
+            cmd = " ".join(task.get_command()))
 
         tmp = tempfile.NamedTemporaryFile(delete=False)
         tmp_script_filename = tmp.name
         tmp.write(script_content.encode())
         tmp.close()
 
-        command = ["qsub", tmp_script_filename]
+        command = ["qsub", "-o", f"log/sf-{task.uid}.out", tmp_script_filename]
         try:
             output = subprocess.check_output(command).decode()
             JOB_ID = output.replace("\n","")
@@ -225,7 +233,7 @@ cd {wd}
                         mem = task.mem,
                         ncore = task.ncore,
                         wd = os.getcwd(), 
-                        cmd = " ".join(task.get_command()),
+                        cmd =task.get_command(), # " ".join(
                         account = self.account,
                         partion = self.partition,
                         modules = self.modules,
