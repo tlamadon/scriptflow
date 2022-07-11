@@ -187,7 +187,7 @@ class HpcRunner_slurm(AbstractRunner):
 #!/bin/bash
 
 #SBATCH --account={account} # phd, pi-[faculty], etc.
-#SBATCH --partition={partion} # standard, gpu, etc.
+#SBATCH --partition={partition} # standard, gpu, etc.
 #SBATCH --mem-per-cpu={mem}G
 #SBATCH --cpus-per-task={ncore} 
 #SBATCH --time=0-{walltime} # wall clock limit (d-hh:mm:ss)
@@ -233,9 +233,9 @@ cd {wd}
                         mem = task.mem,
                         ncore = task.ncore,
                         wd = os.getcwd(), 
-                        cmd =task.get_command(), # " ".join(
+                        cmd = " ".join(task.get_command()),
                         account = self.account,
-                        partion = self.partition,
+                        partition = self.partition,
                         modules = self.modules,
                         walltime = self.walltime)
 
