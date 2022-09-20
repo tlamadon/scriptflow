@@ -10,31 +10,31 @@ import os
 
 # set executor to slurm or hpc 
 
-# sf.init({
-#     "executors":{
-#         "slurm":{
-#             "maxsize": 2,
-#             "account": 'pi-chansen1',
-#             "partition": 'standard',
-#             "modules": 'R/3.6/3.6.2',
-#             "walltime": '00:01:00'
-#         } 
-#     },
-#     'debug': True,
-#     'notify': "thomas"
-# })
-
 sf.init({
     "executors":{
-        "hpc":{
-            "maxsize": 3,
-            "modules": 'R/3.5.3',
+        "slurm":{
+            "maxsize": 2,
+            "account": 'pi-chansen1',
+            "partition": 'standard',
+            "modules": 'R/3.6/3.6.2',
             "walltime": '00:01:00'
         } 
     },
     'debug': True,
     'notify': "thomas"
 })
+
+# sf.init({
+#     "executors":{
+#         "hpc":{
+#             "maxsize": 3,
+#             "modules": 'R/3.5.3',
+#             "walltime": '00:01:00'
+#         } 
+#     },
+#     'debug': True,
+#     'notify': "thomas"
+# })
 
 # create temp-directory to store results in
 temp_dir = 'temp'

@@ -254,8 +254,8 @@ cd {wd}
 
     def update(self, controller):
         # checking job status
-        output = subprocess.check_output("squeue").decode()
-        lines = output.split("\n") 
+        output = subprocess.getstatusoutput("squeue --user=wiemann")[1]#check_output("squeue --user=wiemann")#.decode()
+        lines = output.split("\n")
         job_status = {}
         for l in lines[2:]:                    
             vals = l.split()
@@ -270,12 +270,12 @@ cd {wd}
 
         for (k,p) in to_remove:
             del self.processes[k]
-            controller.add_completed( p["job"] )
+            controller.add_completed(p["job"])
 
     async def loop(self,controller):
         while True:
             self.update(controller)                 
-            await asyncio.sleep(2) 
+            await asyncio.sleep(1) 
 
 EXECUTORS = {    
     "local" : CommandRunner,
