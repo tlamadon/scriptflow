@@ -108,7 +108,6 @@ class HpcRunner(AbstractRunner):
         self.modules = conf.modules
         self.walltime = conf.walltime
         self.processes = {}
-        self.job_params = {'procs':1, 'mem' : 16, 'name':'psub'}
 
         # create log-directory
         if not os.path.exists("log"):
@@ -210,6 +209,7 @@ cd {wd}
         conf = OmegaConf.create(conf)
         self.max_proc = conf.maxsize
         self.processes = {}
+        self.user = conf.user
         self.account = conf.account
         self.partition = conf.partition
         self.modules = conf.modules
@@ -254,7 +254,7 @@ cd {wd}
 
     def update(self, controller):
         # checking job status
-        output = subprocess.getstatusoutput("squeue --user=wiemann")[1]#check_output("squeue --user=wiemann")#.decode()
+        output = subprocess.getstatusoutput(f"squeue --user={self.user}")[1]
         lines = output.split("\n")
         job_status = {}
         for l in lines[2:]:                    

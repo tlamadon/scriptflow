@@ -15,6 +15,7 @@ sf.init({
         "slurm":{
             "maxsize": 2,
             "account": 'pi-chansen1',
+            "user": 'wiemann',
             "partition": 'standard',
             "modules": 'R/3.6/3.6.2',
             "walltime": '00:01:00'
