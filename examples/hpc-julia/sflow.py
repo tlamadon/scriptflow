@@ -1,8 +1,8 @@
 """
-Example for scriptflow on a slurm-hpc.
+Example for scriptflow 
 
 Adapt hpc parameters to your specifications. Then run via the command:
-> scriptflow run Rit
+> scriptflow run mysim
 """
 
 import scriptflow as sf
@@ -13,11 +13,11 @@ import os
 # sf.init({ # Runner for Slurm
 #     "executors":{
 #         "slurm":{
-#             "maxsize": 2,
+#             "maxsize": 3,
 #             "account": 'pi-chansen1',
 #             "user": 'wiemann',
 #             "partition": 'standard',
-#             "modules": 'R/3.6/3.6.2',
+#             "modules": 'julia/1.8',
 #             "walltime": '00:01:00'
 #         } 
 #     },
@@ -29,7 +29,7 @@ sf.init({ # Runner for PBS
     "executors":{
         "hpc":{
             "maxsize": 3,
-            "modules": 'R/3.5.3',
+            "modules": 'julia/1.8.3',
             "walltime": '00:01:00'
         } 
     },
@@ -43,14 +43,14 @@ if not os.path.exists(temp_dir):
     os.mkdir(temp_dir)
 
 # define a flow called Rit
-async def flow_Rit():
+async def flow_mysim():
 
     # Generates 5 simulation draws from a bivariate normal and stores as .csv
     tasks = [
         sf.Task(
-        cmd = f"R --vanilla  '--args {i} {temp_dir}' < gen_results.R",
-        outputs = f"{temp_dir}/res_{i}.RData",
-        name = f"sim-{i}").set_retry(2)
+        cmd = f"julia gen_results.jl {i}",
+        outputs = f"{temp_dir}/res_{i}.csv",
+        name = f"sim-{i}")
         for i in range(5)
     ]
 
@@ -58,7 +58,7 @@ async def flow_Rit():
 
     # Aggregates the simulation results and stores as .csv
     t_agg = sf.Task(
-        cmd = f"R --vanilla  '--args {temp_dir}' < agg_results.R",
+        cmd = f"julia agg_results.jl {temp_dir}",
         outputs = "results.csv",
         name = "agg-results")
     
