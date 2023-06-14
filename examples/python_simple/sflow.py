@@ -62,8 +62,3 @@ async def flow_sleepit():
     # tasks = [ sf.Task(
     #     ["python", "-c", f"import time; time.sleep(5); open('test_{i}.txt','w').write('4');"]).uid(f"test_{i}").output(f"test_{i}.txt") for i in range(10,20)]
     # await sf.bag(*tasks)
-
-
-
-
-

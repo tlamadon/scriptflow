@@ -37,7 +37,7 @@ import os
 #     'notify': "thomas"
 # })
 
-sf.init({
+sf.init({ # local runner
     "executors":{
         "local": {
             "maxsize" : 5

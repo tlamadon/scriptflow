@@ -35,7 +35,7 @@ import os
 #     'debug': True
 # })
 
-sf.init({
+sf.init({ # local runner
     "executors":{
         "local": {
             "maxsize" : 5
@@ -48,31 +48,6 @@ sf.init({
 temp_dir = 'temp'
 if not os.path.exists(temp_dir):
     os.mkdir(temp_dir)
-    
-    
-# cmd = "julia gen_results.jl 1"
-
-
-
-# import subprocess,shlex
-# i = 1
-# cmd = f"julia gen_results.jl  {i}"
-# cmd_2 = shlex.split(cmd)
-
-# a = subprocess.call(cmd_2)
-
-# process = subprocess.Popen(cmd_2, shell = False, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-# process.poll()
-
-
-
-
-# stdoutdata, stderrdata = process.communicate()
-# print(process.returncode)
-
-
-
-# a = subprocess.call(cmd_2, shell=True)
 
 # define a flow called Rit
 async def flow_mysim():
