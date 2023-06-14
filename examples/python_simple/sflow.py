@@ -36,12 +36,14 @@ async def flow_sleepit():
 
     i=1
     t1 = sf.Task(
+        split_cmd = False,
         cmd = f"""python -c "import time; time.sleep(2); open('test_{i}.txt','w').write('5');" """,
         outputs = f"test_{i}.txt",
         name = f"solve-{i}")
 
     i=2
     t2 = sf.Task(
+        split_cmd = False,
         cmd = f"""python -c "import time; time.sleep(2); open('test_{i}.txt','w').write('5');" """,
         outputs = f"test_{i}.txt",
         name = f"solve-{i}")
@@ -49,6 +51,7 @@ async def flow_sleepit():
     await sf.bag(t1,t2)
 
     tfinal = sf.Task(
+        split_cmd = False,
         cmd = f"""python -c "import sflow; sflow.compare_file()" """,
         outputs = "final.txt",
         name = "final",

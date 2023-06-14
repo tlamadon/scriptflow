@@ -6,7 +6,7 @@ uid = args[1]
 temp_dir = args[2]
 
 # Pause momentarily and print job-id to the log-file
-Sys.sleep(0.5)
+Sys.sleep(1)
 print(uid)
 
 # For illustrative purposes only: include error to trigger scriptflow's retry

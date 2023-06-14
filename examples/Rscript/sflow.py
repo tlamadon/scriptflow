@@ -1,8 +1,8 @@
 """
-Example for scriptflow 
+Example for scriptflow on a slurm-hpc.
 
 Adapt hpc parameters to your specifications. Then run via the command:
-> scriptflow run mysim
+> scriptflow run Rit
 """
 
 import scriptflow as sf
@@ -13,11 +13,11 @@ import os
 # sf.init({ # Runner for Slurm
 #     "executors":{
 #         "slurm":{
-#             "maxsize": 3,
+#             "maxsize": 2,
 #             "account": 'pi-chansen1',
 #             "user": 'wiemann',
 #             "partition": 'standard',
-#             "modules": 'julia/1.8',
+#             "modules": 'R/3.6/3.6.2',
 #             "walltime": '00:01:00'
 #         } 
 #     },
@@ -25,16 +25,25 @@ import os
 #     'notify': "thomas"
 # })
 
-sf.init({ # Runner for PBS
+# sf.init({ # Runner for PBS
+#     "executors":{
+#         "hpc":{
+#             "maxsize": 3,
+#             "modules": 'R/3.5.3',
+#             "walltime": '00:01:00'
+#         } 
+#     },
+#     'debug': True,
+#     'notify': "thomas"
+# })
+
+sf.init({
     "executors":{
-        "hpc":{
-            "maxsize": 3,
-            "modules": 'julia/1.8.3',
-            "walltime": '00:01:00'
+        "local": {
+            "maxsize" : 5
         } 
     },
-    'debug': True,
-    'notify': "thomas"
+    'debug':True
 })
 
 # create temp-directory to store results in
@@ -43,14 +52,15 @@ if not os.path.exists(temp_dir):
     os.mkdir(temp_dir)
 
 # define a flow called Rit
-async def flow_mysim():
+async def flow_Rit():
 
     # Generates 5 simulation draws from a bivariate normal and stores as .csv
     tasks = [
         sf.Task(
-        cmd = f"julia gen_results.jl {i}",
-        outputs = f"{temp_dir}/res_{i}.csv",
-        name = f"sim-{i}")
+        split_cmd = True, quiet = True,
+        cmd = f"Rscript --vanilla gen_results.R {i} {temp_dir}",
+        outputs = f"{temp_dir}/res_{i}.RData",
+        name = f"sim-{i}").set_retry(2)
         for i in range(5)
     ]
 
@@ -58,10 +68,13 @@ async def flow_mysim():
 
     # Aggregates the simulation results and stores as .csv
     t_agg = sf.Task(
-        cmd = f"julia agg_results.jl {temp_dir}",
+        split_cmd = True, quiet = True,
+        cmd = f"Rscript --vanilla  agg_results.R {temp_dir}",
         outputs = "results.csv",
         name = "agg-results")
     
     await t_agg
 
     # Can add cleanup-tasks here (e.g., to remove temp_dir)
+    # for f in os.listdir(temp_dir):
+    #     os.remove(os.path.join(temp_dir, f))
