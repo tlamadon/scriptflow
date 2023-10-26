@@ -91,11 +91,14 @@ class HpcRunner(AbstractRunner):
 
     script_template = """
     #PBS -N {name}
-    #PBS -j oe
+    #PBS -A {account}
     #PBS -V
+    #PBS -j oe
+    #PBS -o log/{name}.out
     #PBS -l procs={procs},mem={mem}Gb
     #PBS -l walltime={walltime}
 
+    
     module load {modules}
     cd {wd}
 
@@ -104,6 +107,7 @@ class HpcRunner(AbstractRunner):
 
     def __init__(self, conf):
         conf = OmegaConf.create(conf)
+        self.account = conf.account
         self.max_proc = conf.maxsize
         self.modules = conf.modules
         self.walltime = conf.walltime
@@ -124,6 +128,7 @@ class HpcRunner(AbstractRunner):
         # create the script
         script_content = self.script_template.format(
             name = "sf-{}".format(task.uid),
+            account = self.account,
             mem = task.mem,
             procs = task.ncore,
             modules = self.modules,
@@ -136,7 +141,7 @@ class HpcRunner(AbstractRunner):
         tmp.write(script_content.encode())
         tmp.close()
 
-        command = ["qsub", "-o", f"log/sf-{task.uid}.out", tmp_script_filename]
+        command = ["qsub", tmp_script_filename]
         try:
             output = subprocess.check_output(command).decode()
             JOB_ID = output.replace("\n","")

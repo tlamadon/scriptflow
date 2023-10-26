@@ -25,26 +25,27 @@ import os
 #     'notify': "thomas"
 # })
 
-# sf.init({ # Runner for PBS
-#     "executors":{
-#         "hpc":{
-#             "maxsize": 3,
-#             "modules": 'R/3.5.3',
-#             "walltime": '00:01:00'
-#         } 
-#     },
-#     'debug': True,
-#     'notify': "thomas"
-# })
-
-sf.init({ # local runner
+sf.init({ # Runner for PBS
     "executors":{
-        "local": {
-            "maxsize" : 5
+        "hpc":{
+            "account": "wiemann",
+            "maxsize": 3,
+            "modules": 'R/3.5.3',
+            "walltime": '00:01:00'
         } 
     },
-    'debug':True
+    'debug': True,
+    'notify': "thomas"
 })
+
+# sf.init({ # local runner
+#     "executors":{
+#         "local": {
+#             "maxsize" : 5
+#         } 
+#     },
+#     'debug':True
+# })
 
 # create temp-directory to store results in
 temp_dir = 'temp'

@@ -27,6 +27,7 @@ import os
 # sf.init({ # Runner for PBS
 #     "executors":{
 #         "hpc":{
+#             "account": "wiemann",
 #             "maxsize": 3,
 #             "modules": 'julia/1.8.3',
 #             "walltime": '00:01:00'
