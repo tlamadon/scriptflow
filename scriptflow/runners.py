@@ -99,7 +99,7 @@ class HpcRunner(AbstractRunner):
     module load {modules}
     cd {wd}
 
-    {cmd}
+    {cmd} &> log/capture_{name}.txt
     """
 
     def __init__(self, conf):
