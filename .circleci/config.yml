@@ -23,10 +23,10 @@ jobs:
             - deps-{{ checksum "pyproject.toml" }}
 
       - run:
-	        name: Install poetry
-	        command: |
-	          pip install poetry==1.7.1
-	          poetry config virtualenvs.create false
+          name: Install poetry
+          command: |
+            pip install poetry==1.7.1
+            poetry config virtualenvs.create false
 
       # Install the dependencies
       - run:
