@@ -1,4 +1,4 @@
-version: 2
+version: 2.1
 
 jobs:
 
@@ -48,7 +48,6 @@ jobs:
 
 # In the workflows section, we specify when we want to run the jobs defined
 workflows:
-  version: 2
 
   # The build-and-test we will run EVERYTIME a piece of code changes
   build-and-test-workflow:
