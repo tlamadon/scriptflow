@@ -3,10 +3,11 @@ sf-solve-*
 dist/
 
 # Example output
-*.json
 *.csv
 *.log
 *.txt
 .sf
 log
 temp
+
+sf.json
