@@ -15,7 +15,8 @@ sf.init({
             "maxsize" : 5
         } 
     },
-    'debug':True
+    'debug':True,
+    'classic_terminal':False
 })
 
 
@@ -52,7 +53,7 @@ async def flow_sleepit():
         cmd = f"""python -c "import sflow; sflow.compare_file()" """,
         outputs = "final.txt",
         name = "final",
-        inputs = [t1.outputs, t2.outputs])
+        inputs = [*t1.get_outputs(),*t1.get_outputs()])
 
     await tfinal
 

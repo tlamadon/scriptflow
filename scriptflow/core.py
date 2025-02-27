@@ -82,6 +82,7 @@ class Controller:
 
         self.shut_me_down = False
         self.loop = None
+        self.classic_terminal = conf.get('classic_terminal',False)
 
         self.msg_queue = queue.Queue()
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -182,6 +183,7 @@ class Controller:
             # fixme, get the date of the most recent output
 
             UP_TO_DATE = True
+            console.log("checking deps: {}".format(task.deps))
             for f in task.deps:
                 if os.path.getmtime(f) > output_time:    
                     self.log("task [red]{}[/red]: input [green]{}[/green] more recent than output".format(task.uid, f))
@@ -232,9 +234,32 @@ class Controller:
             co_task.add_done_callback(_handle_task_result)
 
         # run my own event loop
-        with console.status("Running ...") as status:
-            while True:
+        if self.classic_terminal:
+            with console.status("Running ...") as status:
+                while True:
 
+                    # logging messages
+                    while not self.msg_queue.empty():
+                        msg = self.msg_queue.get()
+                        console.log(msg)
+
+                    # check tasks
+                    self.update()
+
+                    # updating status
+                    running = 0
+                    capacity = 0
+                    for exec in self.executors.values():
+                        running += exec.size()
+                        capacity += exec.size() + exec.available_slots()
+
+                    status.update(f"running [green]queued:{self.task_queue.qsize()} [/green] [yellow]running:{running}/{capacity} [/yellow] [purple]done:{self.done} / failed:{self.failed}[/purple] ...")
+                    # send updates to sever if any
+                    self.notify(running, capacity)
+
+                    await asyncio.sleep(0.1)
+        else:
+            while True:
                 # logging messages
                 while not self.msg_queue.empty():
                     msg = self.msg_queue.get()
@@ -250,7 +275,7 @@ class Controller:
                     running += exec.size()
                     capacity += exec.size() + exec.available_slots()
 
-                status.update(f"running [green]queued:{self.task_queue.qsize()} [/green] [yellow]running:{running}/{capacity} [/yellow] [purple]done:{self.done} / failed:{self.failed}[/purple] ...")
+                # status.update(f"running [green]queued:{self.task_queue.qsize()} [/green] [yellow]running:{running}/{capacity} [/yellow] [purple]done:{self.done} / failed:{self.failed}[/purple] ...")
                 # send updates to sever if any
                 self.notify(running, capacity)
 
