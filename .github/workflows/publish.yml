@@ -3,6 +3,10 @@ name: Publish to PyPI
 on:
   workflow_dispatch:
 
+permissions:
+  id-token: write  # Required for OpenID Connect authentication
+  contents: read
+
 jobs:
   publish:
     name: Publish Python Package
@@ -21,4 +25,9 @@ jobs:
       - run: poetry --version
       - run: poetry install
       - run: poetry build
-      - run: poetry publish
+
+      - name: Publish to PyPI using Trusted Publisher
+        env:
+          POETRY_HTTP_BASIC_PYPI_USERNAME: __token__
+          POETRY_HTTP_BASIC_PYPI_PASSWORD: ""
+        run: poetry publish      
