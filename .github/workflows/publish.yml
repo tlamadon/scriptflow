@@ -29,5 +29,5 @@ jobs:
       - name: Publish to PyPI using Trusted Publisher
         env:
           POETRY_HTTP_BASIC_PYPI_USERNAME: __token__
-          POETRY_HTTP_BASIC_PYPI_PASSWORD: ""
+          POETRY_HTTP_BASIC_PYPI_PASSWORD: ${{ secrets.PYPI_TOKEN }}
         run: poetry publish      
