@@ -165,8 +165,8 @@ class HpcRunner(AbstractRunner):
                 to_remove.append(k)
 
         for k in to_remove:
-            del self.processes[k]
-            controller.add_completed( p["job"] )
+            proc = self.processes.pop(k)
+            controller.add_completed(proc["job"])
 
     async def loop(self,controller):
         while True:
