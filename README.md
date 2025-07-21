@@ -1,6 +1,6 @@
 # scriptflow
 
-[![CircleCI](https://circleci.com/gh/tlamadon/scriptflow/tree/main.svg?style=svg)](https://circleci.com/gh/tlamadon/scriptflow/tree/main) [![PyPI version](https://badge.fury.io/py/scriptflow.svg)](https://badge.fury.io/py/scriptflow) [![codecov](https://codecov.io/gh/tlamadon/scriptflow/branch/main/graph/badge.svg?token=0E8J7635HD)](https://codecov.io/gh/tlamadon/scriptflow)
+[![Testing](https://github.com/tlamadon/scriptflow/actions/workflows/tests.yml/badge.svg)](https://github.com/tlamadon/scriptflow/actions/workflows/tests.yml) [![PyPI version](https://badge.fury.io/py/scriptflow.svg)](https://badge.fury.io/py/scriptflow) [![codecov](https://codecov.io/gh/tlamadon/scriptflow/branch/main/graph/badge.svg?token=0E8J7635HD)](https://codecov.io/gh/tlamadon/scriptflow)
 
 Small library that allows scheduling scripts asyncrhonously on different platforms. Think of it as a Make when you can write the dependencies as python code, and that can run locally, on an HPC or in the cloud (cloud is not implemented just yet).
 
