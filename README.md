@@ -149,11 +149,8 @@ poetry run codecov -t <token>
 
 ```
 
-
-
-
 ### Docker images to try the different schedulers
 
  - [PBS](https://openpbs.atlassian.net/wiki/spaces/PBSPro/pages/79298561/Using+Docker+to+Instantiate+PBS)
  - [slurm](https://medium.com/analytics-vidhya/slurm-cluster-with-docker-9f242deee601)
-=======
+
