@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   testing:
-    name: Publish Python Package
+    name: Running pytest
     runs-on: ubuntu-latest
 
     steps:
