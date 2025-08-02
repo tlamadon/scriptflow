@@ -100,7 +100,7 @@ async def flow_sleepit():
     task_final = sf.Task(
       cmd = "python -c 'import sflow; sflow.step2_combine_file()'",
       outputs = f"final.txt",
-      inputs = [*t1.get_outputs(),*t1.get_outputs()])
+      inputs = [*task1.get_outputs(),*task2.get_outputs()])
 
     await task_final
 ```        
@@ -111,7 +111,7 @@ then create a local env, activate, install and run!
 python3 -m venv env
 source env/bin/activate
 pip install scriptflow
-scritpflow run sleepit
+scriptflow run sleepit
 ```
 
 ## Life cycle of a task
