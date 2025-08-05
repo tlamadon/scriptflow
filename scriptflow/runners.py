@@ -54,9 +54,11 @@ class CommandRunner(AbstractRunner):
         if task.quiet:
             subp = subprocess.Popen(task.get_command(),
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.STDOUT)
+                stderr=subprocess.STDOUT,
+                shell=task.shell)
         else:
-            subp = subprocess.Popen(task.get_command())
+            subp = subprocess.Popen(task.get_command(),
+                shell=task.shell)
                 #stdout=subprocess.DEVNULL,
                 #stderr=subprocess.STDOUT)
 

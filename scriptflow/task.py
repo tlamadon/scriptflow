@@ -27,11 +27,13 @@ Solution: store all files references in output as a dictionary, files without a 
 
 """
 class Task:
-    cmd =""
-    uid=""
+    cmd=""
+    uid:str=""
     mem="1"
     ncore="1"
+    shell:int=False
     retry=0
+    quiet:bool=True
 
     """
     Allows to construct the class with several options!
