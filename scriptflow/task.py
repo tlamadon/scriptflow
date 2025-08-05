@@ -31,7 +31,7 @@ class Task:
     uid:str=""
     mem="1"
     ncore="1"
-    shell:int=False
+    shell:bool=False
     retry=0
     quiet:bool=True
 
@@ -43,9 +43,14 @@ class Task:
         self.fut = None
         self.state = "init"
 
+        if "shell" in kwargs.keys():
+            self.shell  = kwargs["shell"]
+        else:
+            self.props = {}
+
         if "cmd" in kwargs.keys():
-            # we check if we have a string, in which case we try to split it
-            if isinstance(kwargs["cmd"], str):
+            # we check if we have a string, in which case we try to split it, but only if shell is False
+            if (not self.shell) and (isinstance(kwargs["cmd"], str)):
                 self.cmd = shlex.split(kwargs["cmd"])
             else:
                 self.cmd  = kwargs["cmd"]
@@ -94,6 +99,8 @@ class Task:
             self.props  = kwargs["props"]
         else:
             self.props = {}
+
+
 
     def __await__(self):
         # we need to check if the task has been scheduled

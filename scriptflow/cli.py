@@ -31,6 +31,7 @@ def _handle_task_result(task: asyncio.Task) -> None:
 """
 async def main(func, controller:sf.Controller):
 
+    print("Running flow: {}".format(func.__name__))
     task_controller = asyncio.create_task( controller.start_loops() )
     task_controller.add_done_callback(_handle_task_result)
 
