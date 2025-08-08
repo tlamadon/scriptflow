@@ -26,18 +26,28 @@ def _handle_task_result(task: asyncio.Task) -> None:
     except Exception:  # pylint: disable=broad-except
         logging.exception('Exception raised by task = %r', task)
 
+def handle_exc(loop, context):
+    msg = context.get("message", "Unhandled exception")
+    exc = context.get("exception")
+    print(f"[loop {id(loop)}] {msg}: {exc!r}")
+
 """
     Main
 """
 async def main(func, controller:sf.Controller):
 
     print("Running flow: {}".format(func.__name__))
+
+    loop = asyncio.get_running_loop()
+    loop.set_exception_handler(handle_exc)
+
     task_controller = asyncio.create_task( controller.start_loops() )
     task_controller.add_done_callback(_handle_task_result)
 
     os.makedirs('.sf', exist_ok=True)
 
-    await func()      
+    await func()
+    # await task_controller # wait for the controller to finish      
     
     # let the other guys finish
     await asyncio.sleep(1)
