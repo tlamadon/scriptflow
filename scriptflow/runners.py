@@ -17,19 +17,20 @@ from datetime import datetime
 from omegaconf import OmegaConf
 import os, tempfile
 import time
+from .task import Task
 
 class AbstractRunner(ABC):
 
     @abstractmethod
-    def size():
+    def size(self) -> int:
         pass
 
     @abstractmethod
-    def available_slots():
+    def available_slots(self):
         pass
 
     @abstractmethod
-    def add(self, task):
+    def add(self, task:Task):
         pass
 
 
@@ -49,18 +50,21 @@ class CommandRunner(AbstractRunner):
     """
         Start tasks
     """
-    def add(self, task):
+    def add(self, task:Task):
 
         if task.quiet:
+            print(f"Running task: {task.get_command()} with shell={task.shell} (quiet)")
             subp = subprocess.Popen(task.get_command(),
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.STDOUT,
                 shell=task.shell)
         else:
+            print("Running task (not quiet): {}".format(task.get_command()))
+            log_file = open(f"{task.uid}.log", "w")
             subp = subprocess.Popen(task.get_command(),
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
                 shell=task.shell)
-                #stdout=subprocess.DEVNULL,
-                #stderr=subprocess.STDOUT)
 
         self.processes[task.hash] = {
             "proc" : subp, 
@@ -73,17 +77,20 @@ class CommandRunner(AbstractRunner):
     """
     async def loop(self, controller):
         while True:
-            self.update(controller)                
+            self.update(controller)   
+            # print(f"Running loop, checking processes... {self.size()} processes running.")             
             await asyncio.sleep(0.1)
 
     def update(self,controller):
         to_remove = []
         for (k,p) in self.processes.items():
+            # print(f"Process {k} completed, removing from runner.")
             poll_val = p["proc"].poll()
             if poll_val is not None:
                 to_remove.append(k)
 
         for k in to_remove:
+            # print(f"Process {k} completed, removing from runner.")
             task = self.processes[k]["task"]
             del self.processes[k]       
             controller.add_completed( task )

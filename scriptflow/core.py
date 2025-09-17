@@ -191,13 +191,16 @@ class Controller:
                     break 
             
             if UP_TO_DATE:
-                self.log(f"task [red]{task.uid}[/red] is up to date, skipping it.")
+                self.log(f"task [green]{task.uid}[/green] is up to date, skipping it.")
                 return(True)
         else:
-            self.log(f"adding [red]{task.uid}[/red] output {task.outputs} is missing")
+            self.log(f"running [red]{task.uid}[/red] because output is missing: {task.outputs} ")
 
         self.log(f"adding [red]{task.uid}[/red]")
-        self.log(" - cmd: {}".format( " ".join(task.get_command() ) ))
+        if task.shell:
+            self.log(" > cmd: {}".format( task.get_command() ) )
+        else:
+            self.log(" > cmd: {}".format( " ".join(task.get_command() ) ))
         return(False)
 
     def complete_task(self, task):
