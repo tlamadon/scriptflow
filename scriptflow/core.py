@@ -237,7 +237,7 @@ class Controller:
             co_task.add_done_callback(_handle_task_result)
 
         # run my own event loop
-        if self.classic_terminal:
+        if not self.classic_terminal:
             with console.status("Running ...") as status:
                 while True:
 
