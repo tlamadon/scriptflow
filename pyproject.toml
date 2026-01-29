@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "scriptflow"
-version = "0.2.11"
+version = "0.2.12"
 description = "Like a makefile but in python, a stripped-down system of Airflow or Luigi"
 authors = ["Thibaut Lamadon <thibaut.lamadon@gmail.com>"]
 readme = "README.md"
