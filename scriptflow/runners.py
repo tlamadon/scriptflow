@@ -204,6 +204,11 @@ echo "Memory per CPU: $SLURM_MEM_PER_CPU"
 module load {modules}
 cd {wd}
 
+if [ -f .env_slurm ]; then
+    export $(grep -v '^#' .env_slurm | xargs)
+    echo ".env_slurm file sourced successfully."
+fi
+
 {cmd}
     """
 
