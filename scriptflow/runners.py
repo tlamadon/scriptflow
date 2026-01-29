@@ -234,7 +234,8 @@ cd {wd}
                         mem = task.mem,
                         ncore = task.ncore,
                         wd = os.getcwd(), 
-                        cmd = " ".join(task.get_command()),
+                        # cmd = " ".join(task.get_command()), I now write full commands with tripple quotes
+                        cmd = task.get_command(),
                         account = self.account,
                         partion = self.partition,
                         modules = self.modules,
