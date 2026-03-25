@@ -189,7 +189,7 @@ class HpcRunner_slurm(AbstractRunner):
 #SBATCH --partition={partition} # standard, gpu, etc.
 #SBATCH --mem-per-cpu={mem}G
 #SBATCH --cpus-per-task={ncore} 
-#SBATCH --time=0-{walltime} # wall clock limit (d-hh:mm:ss)
+#SBATCH --time={walltime} # wall clock limit (d-hh:mm:ss)
 #SBATCH --job-name={name} # user-defined job name
 
 # Print some variables to log file

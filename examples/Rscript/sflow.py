@@ -10,20 +10,20 @@ import os
 
 # set executor to slurm or hpc 
 
-# sf.init({ # Runner for Slurm
-#     "executors":{
-#         "slurm":{
-#             "maxsize": 2,
-#             "account": 'pi-chansen1',
-#             "user": 'wiemann',
-#             "partition": 'standard',
-#             "modules": 'R/3.6/3.6.2',
-#             "walltime": '00:01:00'
-#         } 
-#     },
-#     'debug': True,
-#     'notify': "thomas"
-# })
+sf.init({ # Runner for Slurm
+    "executors":{
+        "slurm":{
+            "maxsize": 2,
+            "account": 'pi-chansen1',
+            "user": 'wiemann',
+            "partition": 'standard',
+            "modules": 'R/4.5/4.5.3',
+            "walltime": '00:01:00'
+        } 
+    },
+    'debug': True,
+    'notify': "thomas"
+})
 
 # sf.init({ # Runner for PBS
 #     "executors":{
@@ -37,14 +37,14 @@ import os
 #     'notify': "thomas"
 # })
 
-sf.init({
-    "executors":{
-        "local": {
-            "maxsize" : 5
-        } 
-    },
-    'debug':True
-})
+# sf.init({
+#     "executors":{
+#         "local": {
+#             "maxsize" : 5
+#         } 
+#     },
+#     'debug':True
+# })
 
 # create temp-directory to store results in
 temp_dir = 'temp'
