@@ -1,76 +1,77 @@
 """
-Example for scriptflow 
+Example: Running Julia simulations on an HPC cluster.
 
-Adapt hpc parameters to your specifications. Then run via the command:
+Uncomment the executor block for your cluster's scheduler, then run:
 > scriptflow run mysim
 """
 
 import scriptflow as sf
 import os
 
-# set executor to slurm or hpc 
+# ==============================================================================
+# Choose ONE executor below, and adapt parameters to your cluster.
+# ==============================================================================
 
-sf.init({ # Runner for Slurm
-    "executors":{
-        "slurm":{
+# --- Option 1: Slurm ---
+sf.init({
+    "executors": {
+        "slurm": {
             "maxsize": 3,
-            "account": 'pi-chansen1',
-            "user": 'wiemann',
-            "partition": 'standard',
-            "modules": 'julia/1.8',
-            "walltime": '00:01:00'
-        } 
+            "account": "my-account",   # your Slurm account
+            "user": "myuser",          # your cluster username
+            "partition": "standard",
+            "modules": "julia/1.10",
+            "walltime": "00:05:00"
+        }
     },
-    'debug': True
+    "debug": True
 })
 
-# sf.init({ # Runner for PBS
-#     "executors":{
-#         "hpc":{
-#             "maxsize": 3,
-#             "modules": 'julia/1.8.3',
-#             "walltime": '00:01:00'
-#         } 
-#     },
-#     'debug': True
-# })
-
+# --- Option 2: PBS ---
 # sf.init({
-#     "executors":{
-#         "local": {
-#             "maxsize" : 5
-#         } 
+#     "executors": {
+#         "hpc": {
+#             "maxsize": 3,
+#             "user": "myuser",
+#             "modules": "julia/1.10",
+#             "walltime": "00:05:00"
+#         }
 #     },
-#     'debug':True
+#     "debug": True
 # })
 
-# create temp-directory to store results in
-temp_dir = 'temp'
-if not os.path.exists(temp_dir):
-    os.mkdir(temp_dir)
+# --- Option 3: Local (for testing) ---
+# sf.init({
+#     "executors": {
+#         "local": {"maxsize": 5}
+#     },
+#     "debug": True
+# })
 
-# define a flow called mysim
+# ==============================================================================
+# Flow
+# ==============================================================================
+
+temp_dir = "temp"
+os.makedirs(temp_dir, exist_ok=True)
+
 async def flow_mysim():
+    """Generate 5 simulation draws, then aggregate."""
 
-    # Generates 5 simulation draws from a bivariate normal and stores as .csv
+    # Phase 1: Generate simulation draws (parallel)
     tasks = [
         sf.Task(
-        cmd = f"julia gen_results.jl {i}",
-        outputs = f"{temp_dir}/res_{i}.csv",
-        name = f"sim-{i}")
+            cmd=f"julia gen_results.jl {i}",
+            outputs=f"{temp_dir}/res_{i}.csv",
+            name=f"sim-{i}"
+        ).set_retry(2)
         for i in range(5)
     ]
-
     await sf.bag(*tasks)
 
-    # Aggregates the simulation results and stores as .csv
-    t_agg = sf.Task(
-        cmd = f"julia agg_results.jl {temp_dir}",
-        outputs = "results.csv",
-        name = "agg-results")
-    
-    await t_agg
-
-    # Can add cleanup-tasks here (e.g., to remove temp_dir)
-    # for f in os.listdir(temp_dir):
-    #     os.remove(os.path.join(temp_dir, f))
+    # Phase 2: Aggregate results (sequential)
+    await sf.Task(
+        cmd=f"julia agg_results.jl {temp_dir}",
+        outputs="results.csv",
+        name="agg-results"
+    )

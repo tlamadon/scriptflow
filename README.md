@@ -1,159 +1,212 @@
 # scriptflow
 
-[![CircleCI](https://circleci.com/gh/tlamadon/scriptflow/tree/main.svg?style=svg)](https://circleci.com/gh/tlamadon/scriptflow/tree/main) [![PyPI version](https://badge.fury.io/py/scriptflow.svg)](https://badge.fury.io/py/scriptflow) [![codecov](https://codecov.io/gh/tlamadon/scriptflow/branch/main/graph/badge.svg?token=0E8J7635HD)](https://codecov.io/gh/tlamadon/scriptflow)
+A lightweight Python library for scheduling and orchestrating computational pipelines on HPC clusters. If you don't like writing complicated makefiles but can write a for-loop in Python, scriptflow might be just what you're looking for.
 
-Small library that allows scheduling scripts asyncrhonously on different platforms. Think of it as a Make when you can write the dependencies as python code, and that can run locally, on an HPC or in the cloud (cloud is not implemented just yet).
+Define task dependencies as Python code using `async`/`await`, and let scriptflow handle job submission, output tracking, and caching.
 
-The status is very experimental. I will likely be changing the interface as I go. 
+## Installation
 
-## Goals:
+### 1. Set up a virtual environment
 
- - [x] works on windows / osx / linux
- - [x] describe dependencies as python code (using await/async)
- - [x] describe scripts with input/output as code
- - [x] clean terminal feedback (using rich)
- - [x] task retry
- - [x] check that output was generated 
- - [x] notifications (using light webserver at [scriptflow.lamadon.com](http://scriptflow.lamadon.com/) )
- - [x] send status to central web service
- - [x] resume flows
- - [ ] clean output
- - [ ] named runs
- - [x] store run information
- - [x] output diagnostic / reporting (tracing how files were created)
- - [x] simpler interface with default head executor and awaitable tasks
- - [x] skip computation based on timestamp of inputs and outpus
- - [ ] load and store tasks results
- - [ ] remove existing output of task if task is started (issue with failing tasks that look like they worked)
- - executors :
-   - [x] local excutor using subprocess 
-   - [x] HPC excutor (monitoring qsub) 
-   - [ ] docker Executor 
-   - [ ] aws executor (probably using Ray)
-   - [ ] dask executor  
- - [x] add check on qsub return values
- - [x] select flow by name from terminal 
- - [ ] ? scripts can create tasks, not sure how to await them. 
- - reporting:
-   - [ ] input and output hashes
-   - [x] start and end datetimes
- - notification system
-   - [x] allow to send messages
-   - [ ] allow for runs
-   - [ ] allow to send messages with html content like images
- - writing tasks and flows 
-   - [ ] cache flows in addition to caching tasks (avoid same task getting scheduled from 2 places)
-   - [ ] a functional api for task creation with hooks
-   - [ ] a functional api for flows
-   - [ ] controller could parse the log file for results (looking for specific triggers)
-   - [ ] allow for glob output/input
-   - [ ] provide simple toml/json interface for simple tasks and flows
-   - [x] use `shlex` to parse command from strings
- - cli
-   - [ ] pass arguments to flows 
-   - [ ] create portable executable
+On the cluster head node:
 
+```bash
+python3 -m venv env
+source env/bin/activate
+pip install --upgrade pip
+```
 
-## Simple flow example:
+### 2. Install scriptflow
 
-Create a file `sflow.py` with:
+```bash
+pip install git+https://github.com/tlamadon/scriptflow.git@ddml-jel
+```
+
+Or install in development mode:
+
+```bash
+git clone -b ddml-jel https://github.com/tlamadon/scriptflow.git
+cd scriptflow
+pip install -e .
+```
+
+### Requirements
+
+- Python ≥ 3.12
+
+### Loading the environment
+
+Every time you want to use scriptflow, activate the virtual environment first:
+
+```bash
+source env/bin/activate
+```
+
+You do not need to reinstall scriptflow each time.
+
+## Quick Start
+
+### 1. Create `sflow.py`
+
+In your project directory, create a file called `sflow.py`:
 
 ```python
 import scriptflow as sf
 
-# set main options
 sf.init({
-    "executors":{
-        "local": {
-            "maxsize" : 5
-        } 
+    "executors": {
+        "slurm": {
+            "maxsize": 50,              # max concurrent Slurm jobs
+            "account": "my-account",    # Slurm account (--account)
+            "user": "myuser",           # cluster username (for squeue polling)
+            "partition": "standard",    # Slurm partition (--partition)
+            "modules": "R/4.5",        # modules loaded on compute nodes
+            "walltime": "1-00:00:00"   # wall clock limit (d-hh:mm:ss)
+        }
     },
-    'debug':True
+    "debug": False
 })
 
-# example of a simple step that combines outcomes
-def step2_combine_file():
-    with open('test_1.txt') as f:
-        a = int(f.readlines()[0])
-    with open('test_2.txt') as f:
-        b = int(f.readlines()[0])
-    with open('final.txt','w') as f:
-        f.write("{}\n".format(a+b))
+async def flow_analysis():
+    # Phase 1: Run 10 tasks in parallel
+    tasks = [
+        sf.Task(
+            cmd=f"Rscript --vanilla myscript.R {i}",
+            outputs=f"output/result_{i}.csv",
+            name=f"task_{i}"
+        ).set_cpu(1).set_memory(8)
+        for i in range(1, 11)
+    ]
+    await sf.bag(*tasks)
 
-# define a flow called sleepit
-async def flow_sleepit():
+    # Phase 2: Aggregate (runs after all Phase 1 tasks complete)
+    await sf.Task(
+        cmd="Rscript --vanilla aggregate.R",
+        outputs="output/final_table.tex",
+        name="aggregate"
+    ).set_cpu(1).set_memory(4)
+```
 
-    i=1
-    task1 = sf.Task(
-      cmd    = f"""python -c "import time; time.sleep(5); open('test_{i}.txt','w').write('5');" """,
-      outputs = f"test_{i}.txt",
-      name   = f"solve-{i}")
+### 2. Run a flow
 
-    i=2
-    task2 = sf.Task(
-      cmd    = f"""python -c "import time; time.sleep(5); open('test_{i}.txt','w').write('5');" """,
-      outputs = f"test_{i}.txt",
-      name   = f"solve-{i}")
+```bash
+scriptflow run analysis
+```
 
-    await sf.bag(task1,task2)
+This discovers `flow_analysis()` in `sflow.py` and executes it.
 
-    task_final = sf.Task(
-      cmd = "python -c 'import sflow; sflow.step2_combine_file()'",
-      outputs = f"final.txt",
-      inputs = [*t1.get_outputs(),*t1.get_outputs()])
+## Core Concepts
 
-    await task_final
-```        
+### Tasks
 
-then create a local env, activate, install and run!
+A `Task` wraps a shell command with metadata:
 
-```shell
-python3 -m venv env
+```python
+task = sf.Task(
+    cmd="Rscript --vanilla myscript.R arg1 arg2",  # shell command
+    outputs="path/to/output_file.csv",              # expected output file(s)
+    name="descriptive_name"                         # task identifier
+)
+```
+
+Resource configuration via chaining:
+
+```python
+task.set_cpu(4)       # CPUs per task (--cpus-per-task)
+task.set_memory(16)   # memory in GB per CPU (--mem-per-cpu)
+task.set_retry(2)     # retry count on failure
+```
+
+If the output file already exists (and is newer than the inputs), the task is **skipped automatically**.
+
+### Flows
+
+Flows are `async` functions prefixed with `flow_`. Use `await` for sequential dependencies and `sf.bag()` for parallel execution:
+
+```python
+async def flow_pipeline():
+    # Parallel: all tasks run simultaneously
+    await sf.bag(task_a, task_b, task_c)
+
+    # Sequential: runs only after the bag above completes
+    await task_d
+```
+
+### Executors
+
+Scriptflow supports three execution backends:
+
+| Executor | Key | Submits via | Status |
+|---|---|---|---|
+| **Slurm** | `"slurm"` | `sbatch` | ✅ Stable |
+| Local | `"local"` | `subprocess` | ✅ Stable (for testing) |
+| PBS | `"hpc"` | `qsub` | ✅ Stable |
+
+**Slurm executor configuration:**
+
+```python
+sf.init({
+    "executors": {
+        "slurm": {
+            "maxsize": 120,                  # max concurrent jobs
+            "account": "my-account",         # --account
+            "user": "myuser",               # for squeue polling
+            "partition": "standard",         # --partition
+            "modules": "R/4.5 python/3.12", # modules loaded on compute nodes
+            "walltime": "1-23:59:59"         # --time (d-hh:mm:ss)
+        }
+    },
+    "debug": False
+})
+```
+
+**Local executor** (useful for testing pipelines without submitting to a cluster):
+
+```python
+sf.init({
+    "executors": {
+        "local": {"maxsize": 4}
+    },
+    "debug": True
+})
+```
+
+## Project Files
+
+When you run scriptflow, the following files are created in your project directory:
+
+| File/Dir | Purpose |
+|---|---|
+| `sflow.py` | Your pipeline definition (you create this) |
+| `log/` | One `.out` file per job with stdout/stderr |
+| `scriptflow.log` | Internal debug log |
+
+To remove all auto-generated files and start fresh:
+
+```bash
+scriptflow clean
+```
+
+## Using tmux
+
+Since scriptflow runs on the head node and monitors job progress, use [tmux](http://tmuxcheatsheet.com/) to keep it running after you disconnect:
+
+```bash
+# Start a new tmux session
+tmux
+
+# Activate your venv and run scriptflow as usual
 source env/bin/activate
-pip install scriptflow
-scritpflow run sleepit
+cd my_project/
+scriptflow run analysis
+
+# Detach from the session (scriptflow keeps running):
+#   press Ctrl+B, then D
+
+# Reconnect later:
+tmux a -t 0
 ```
 
-## Life cycle of a task
+## Example
 
-1. the task object is created. All properties can be edited.
-2. the task is sent to an executor. At this point, the properties of the task are frozen. They can be read, copied but not changed. A unique ID id created from the task from its command and its inputs. The task can be sent by using the `start()` method, or it will be sent automatically when awaited.
-3. the task is awaited, and hence execution is blocked until the task is finished. Nothing can be done at that stage. Again, the task is automatically sent at this stage if it has not be done before. Also note that several tasks can be awaited in parallel by bagging them with `sf.bag(...)`.
-4. the task is completed, the await returns. The task has now it's output attached to it, it can be used in the creation of other tasks.
-
-## Inspiration / Alternatives
-
-I have tried to use the following three alternatives which are all truly excelent!
-
- - [pydoit](https://pydoit.org/)
- - [nextflow](https://www.nextflow.io/)
- - [snakemake](https://snakemake.readthedocs.io/en/stable/)
-
-There were use cases that I could not implement cleanly in the dataflow model of nextflow. I didn't like that snakemake relied on file names to trigger rules, I was constently juggling complicated file names. Pydoit is really great, but I couldn't find how to extend it to build my own executor, and I always found myself confused writing new tasks and dealing with dependencies. 
-
-## Developing
-
-the package is managed using poetry, install poetry first then 
-
-```
-poetry install
-
-# run example
-cd examples/simple-local
-poetry run scriptflow run sleepit
-
-# run tests with coverate
-poetry run python -m pytest --cov=scriptflow
-poetry run coverage xml
-poetry run codecov -t <token>
-
-```
-
-
-
-
-### Docker images to try the different schedulers
-
- - [PBS](https://openpbs.atlassian.net/wiki/spaces/PBSPro/pages/79298561/Using+Docker+to+Instantiate+PBS)
- - [slurm](https://medium.com/analytics-vidhya/slurm-cluster-with-docker-9f242deee601)
-=======
+See [`examples/Rscript/`](examples/Rscript/) for a complete working example that runs R simulations on a Slurm cluster and aggregates the results.

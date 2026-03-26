@@ -10,14 +10,14 @@ from datetime import datetime
 import asyncio
 import logging
 import queue
-import requests
+
 import shlex
 import fnmatch
 
 from rich.console import Console
 from time import sleep
 from os.path import exists
-from tinydb import TinyDB, Query
+
 from omegaconf import OmegaConf
 
 from .task import Task
@@ -70,13 +70,10 @@ class Controller:
 
     def __init__(self, conf = {}, runner = None) -> None:
         conf = OmegaConf.create(conf)
-        self.history = TinyDB('sf.json')
         self.task_queue = queue.Queue()
         self.done   = 0
         self.retry  = 0
         self.failed = 0
-        self.last_notify = ""
-        self.notifty_hash = conf.get('notify',None)
         self.fs = FileSystem()
         self.force_string = conf.get('force',None)
 
@@ -149,7 +146,7 @@ class Controller:
 
         # we check to see if any exectutor has space in their queues
         for exec in self.executors.values():
-            if exec.available_slots()>0:
+            while exec.available_slots()>0 and not self.task_queue.empty():
                 # take the next task
                 task = self.task_queue.get()
 
@@ -157,9 +154,9 @@ class Controller:
                 # this allows to skip the task right away!
                 if self.check_task_uptodate(task):
                     self.complete_task(task)
-                    return
+                    continue
 
-                # send it to the executor
+                # send it to the executor (one per tick)
                 task.set_prop('start_time',datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
                 exec.add(task)
                 return
@@ -199,32 +196,10 @@ class Controller:
         return(False)
 
     def complete_task(self, task):
-        # load the results if any
-        # TBD
-
-        self.update_history(task)
-
         # mark the promise as completed and set it to itself
         assert asyncio.isfuture(task.fut)
         assert not task.fut.done()
         task.set_completed()
-
-    def update_history(self, task):
-        # append job to history - replace this with upsert
-        # @fixme here sometimes the props don't exist yet, they need to be given a default, or ignored. This happen
-        # this happens in particular when skipping the task (then it needs to load first)
-        tj = Query()
-
-        newdict = { 
-            'deps' : task.deps,
-            'output' : task.outputs,
-            'cmd': task.get_command()
-        }
-
-        # add all available props
-        newdict.update(task.props)
-
-        self.history.upsert(newdict, tj.hash == task.hash)
 
     async def start_loops(self):
         for exec in self.executors.values():
@@ -251,8 +226,6 @@ class Controller:
                     capacity += exec.size() + exec.available_slots()
 
                 status.update(f"running [green]queued:{self.task_queue.qsize()} [/green] [yellow]running:{running}/{capacity} [/yellow] [purple]done:{self.done} / failed:{self.failed}[/purple] ...")
-                # send updates to sever if any
-                self.notify(running, capacity)
 
                 await asyncio.sleep(0.1)
 
@@ -268,17 +241,6 @@ class Controller:
     def log(self, str):
         self.msg_queue.put(str)
 
-    """
-    notify server
-    """
-    def notify(self,running, capacity):
-
-        notify_str = "running={}&queued={}&completed={}&failed={}&retry={}".format(
-            running, self.task_queue.qsize(), self.done, self.failed, self.retry)
-
-        if notify_str != self.last_notify:
-            requests.get('http://scriptflow.lamadon.com/test.php?hash={}&{}'.format(self.notifty_hash, notify_str))
-            self.last_notify = notify_str
 
     """
     called when flow finishes

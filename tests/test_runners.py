@@ -32,7 +32,7 @@ async def test_runner(monkeypatch):
         "check_output", 
         Mock(side_effect = subprocess_return))
 
-    runner = sf.HpcRunner({'maxsize':5})
+    runner = sf.HpcRunner({'maxsize':5, 'user':'testuser', 'modules':'', 'walltime':'00:01:00'})
     t1 = sf.Task(cmd="test")
     runner.add(t1)
 

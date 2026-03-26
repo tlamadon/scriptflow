@@ -68,5 +68,44 @@ def run(name="",force=None,load="sflow.py"):
     
     asyncio.run(main(func, controller))
 
+@cli.command()
+@click.option('--yes', '-y', is_flag=True, help='Skip confirmation prompt')
+def clean(yes):
+    """Remove auto-generated files: log/, scriptflow.log, .sf/"""
+    import shutil
+
+    targets = [
+        ('scriptflow.log', 'file'),
+        ('log', 'dir'),
+        ('.sf', 'dir'),
+    ]
+
+    found = [(path, kind) for path, kind in targets if os.path.exists(path)]
+
+    if not found:
+        click.echo("Nothing to clean.")
+        return
+
+    click.echo("Will remove:")
+    for path, kind in found:
+        if kind == 'dir':
+            n = len(os.listdir(path))
+            click.echo(f"  {path}/ ({n} files)")
+        else:
+            size = os.path.getsize(path)
+            click.echo(f"  {path} ({size:,} bytes)")
+
+    if not yes:
+        click.confirm("Proceed?", abort=True)
+
+    for path, kind in found:
+        if kind == 'dir':
+            shutil.rmtree(path)
+        else:
+            os.remove(path)
+        click.echo(f"  Removed {path}")
+
+    click.echo("Done.")
+
 # if __name__ == '__main__':
 #     cli()

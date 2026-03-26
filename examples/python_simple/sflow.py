@@ -1,69 +1,84 @@
 """
-Simple example with dependencis. Install scriptflow with pip install scriptflow then run 
+Example: Running Python tasks locally.
 
+This example uses the local executor (subprocess). Run via:
 > scriptflow run sleepit
-
 """
-
 
 import scriptflow as sf
 
-# set main options
+# ==============================================================================
+# Choose ONE executor below, and adapt parameters to your cluster.
+# ==============================================================================
+
+# --- Option 1: Local (default for this example) ---
 sf.init({
-    "executors":{
-        "local": {
-            "maxsize" : 5
-        } 
+    "executors": {
+        "local": {"maxsize": 5}
     },
-    'debug':True
+    "debug": True
 })
 
+# --- Option 2: Slurm ---
+# sf.init({
+#     "executors": {
+#         "slurm": {
+#             "maxsize": 5,
+#             "account": "my-account",
+#             "user": "myuser",
+#             "partition": "standard",
+#             "modules": "python/3.12",
+#             "walltime": "00:05:00"
+#         }
+#     },
+#     "debug": True
+# })
+
+# --- Option 3: PBS ---
+# sf.init({
+#     "executors": {
+#         "hpc": {
+#             "maxsize": 5,
+#             "user": "myuser",
+#             "modules": "python/3.12",
+#             "walltime": "00:05:00"
+#         }
+#     },
+#     "debug": True
+# })
+
+# ==============================================================================
+# Flow
+# ==============================================================================
 
 def compare_file():
-
-    with open('test_1.txt') as f:
+    with open("test_1.txt") as f:
         a = int(f.readlines()[0])
-
-    with open('test_2.txt') as f:
+    with open("test_2.txt") as f:
         b = int(f.readlines()[0])
+    with open("final.txt", "w") as f:
+        f.write(f"{a + b}\n")
 
-    with open('final.txt','w') as f:
-        f.write("{}\n".format(a+b))
 
-
-# define a flow called sleepit
 async def flow_sleepit():
+    """Create two files in parallel, then combine them."""
 
-    i=1
+    # Phase 1: Generate two files (parallel)
     t1 = sf.Task(
-        split_cmd = False,
-        cmd = f"""python -c "import time; time.sleep(2); open('test_{i}.txt','w').write('5');" """,
-        outputs = f"test_{i}.txt",
-        name = f"solve-{i}")
-
-    i=2
+        cmd="""python -c "import time; time.sleep(2); open('test_1.txt','w').write('5')" """,
+        outputs="test_1.txt",
+        name="solve-1"
+    )
     t2 = sf.Task(
-        split_cmd = False,
-        cmd = f"""python -c "import time; time.sleep(2); open('test_{i}.txt','w').write('5');" """,
-        outputs = f"test_{i}.txt",
-        name = f"solve-{i}")
+        cmd="""python -c "import time; time.sleep(2); open('test_2.txt','w').write('5')" """,
+        outputs="test_2.txt",
+        name="solve-2"
+    )
+    await sf.bag(t1, t2)
 
-    await sf.bag(t1,t2)
-
-    tfinal = sf.Task(
-        split_cmd = False,
-        cmd = f"""python -c "import sflow; sflow.compare_file()" """,
-        outputs = "final.txt",
-        name = "final",
-        inputs = [t1.outputs, t2.outputs])
-
-    await tfinal
-
-    # tasks = [ sf.Task(
-    #     ["python", "-c", f"import time; time.sleep(5); open('test_{i}.txt','w').write('4');"]).uid(f"test_{i}").output(f"test_{i}.txt") for i in range(10,20)]
-    # await sf.bag(*tasks)
-
-
-
-
-
+    # Phase 2: Combine results (sequential)
+    await sf.Task(
+        cmd="""python -c "import sflow; sflow.compare_file()" """,
+        outputs="final.txt",
+        name="final"
+    )

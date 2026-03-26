@@ -89,22 +89,36 @@ class CommandRunner(AbstractRunner):
 
 class HpcRunner(AbstractRunner):
 
-    script_template = """
-    #PBS -N {name}
-    #PBS -j oe
-    #PBS -V
-    #PBS -l procs={procs},mem={mem}Gb
-    #PBS -l walltime={walltime}
+    script_template = """\
+#!/bin/bash
 
-    module load {modules}
-    cd {wd}
+#PBS -N {name}
+#PBS -j oe
+#PBS -l procs={procs},mem={mem}gb
+#PBS -l walltime={walltime}
 
-    {cmd}
+echo "Job ID: $PBS_JOBID"
+echo "Job Name: $PBS_JOBNAME"
+echo "Node: $(hostname)"
+echo "Start Time: $(date +'%Y-%m-%d %H:%M:%S')"
+echo "----------------------------------------"
+
+module load {modules}
+cd {wd}
+
+{cmd}
+EXIT_CODE=$?
+
+echo "----------------------------------------"
+echo "End Time: $(date +'%Y-%m-%d %H:%M:%S')"
+echo "Exit Code: $EXIT_CODE"
+exit $EXIT_CODE
     """
 
     def __init__(self, conf):
         conf = OmegaConf.create(conf)
         self.max_proc = conf.maxsize
+        self.user = conf.user
         self.modules = conf.modules
         self.walltime = conf.walltime
         self.processes = {}
@@ -131,7 +145,7 @@ class HpcRunner(AbstractRunner):
             wd = os.getcwd(), 
             cmd = " ".join(task.get_command()))
 
-        tmp = tempfile.NamedTemporaryFile(delete=False)
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.sh')
         tmp_script_filename = tmp.name
         tmp.write(script_content.encode())
         tmp.close()
@@ -140,15 +154,14 @@ class HpcRunner(AbstractRunner):
         try:
             output = subprocess.check_output(command).decode()
             JOB_ID = output.replace("\n","")
-            
-            self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"S", 'start':time.time()}          
+            self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"S", "start": time.time()}          
         except subprocess.CalledProcessError as e:
-            self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"F", 'start':time.time()}          
+            logging.error("qsub failed for task %s: %s", task.uid, e)
 
     def update(self, controller):
 
-        # checking job status
-        output = subprocess.check_output("qstat").decode()
+        # checking job status (filtered to our user)
+        output = subprocess.getstatusoutput(f"qstat -u {self.user}")[1]
         lines = output.split("\n") 
         job_status = {}
         for l in lines[2:]:                    
@@ -159,16 +172,14 @@ class HpcRunner(AbstractRunner):
 
         to_remove = []
         for (k,p) in self.processes.items():
-
             if p["JOB_ID"] not in job_status.keys():
-
-                # we expire the job if longer than 5 minutes
-                if time.time() - p["start"] > 5*60:
-                    job_status[p["JOB_ID"]] = {'status':'C'}
-                else:
+                # grace period: don't mark as completed until 30s after submission
+                # (qstat may not show the job immediately after qsub)
+                if time.time() - p["start"] < 30:
                     continue
+                to_remove.append((k, p))
 
-            if job_status[p["JOB_ID"]]['status'] == 'C':
+            elif job_status[p["JOB_ID"]]['status'] == 'C':
                 to_remove.append((k, p))
 
         for (k, p) in to_remove:
@@ -179,6 +190,7 @@ class HpcRunner(AbstractRunner):
         while True:
             self.update(controller)                 
             await asyncio.sleep(2)
+
 
 class HpcRunner_slurm(AbstractRunner):
 
@@ -192,17 +204,26 @@ class HpcRunner_slurm(AbstractRunner):
 #SBATCH --time={walltime} # wall clock limit (d-hh:mm:ss)
 #SBATCH --job-name={name} # user-defined job name
 
-# Print some variables to log file
+# Print job info
 echo "Job ID: $SLURM_JOB_ID"
 echo "Job User: $SLURM_JOB_USER"
 echo "Job Name: $SLURM_JOB_NAME"
+echo "Node: $SLURM_NODELIST"
 echo "CPUs per Node: $SLURM_JOB_CPUS_PER_NODE"
 echo "Memory per CPU: $SLURM_MEM_PER_CPU"
+echo "Start Time: $(date +'%Y-%m-%d %H:%M:%S')"
+echo "----------------------------------------"
 
 module load {modules}
 cd {wd}
 
 {cmd}
+EXIT_CODE=$?
+
+echo "----------------------------------------"
+echo "End Time: $(date +'%Y-%m-%d %H:%M:%S')"
+echo "Exit Code: $EXIT_CODE"
+exit $EXIT_CODE
     """
 
     def __init__(self, conf):
@@ -244,20 +265,20 @@ cd {wd}
         tmp.write(script_content.encode())
         tmp.close()
 
-        command = ["sbatch", "-o", f"log/sf-{task.uid}.out", tmp_script_filename]
+        command = ["sbatch", "--export=NONE", "-o", f"log/sf-{task.uid}.out", tmp_script_filename]
         try:
             output = subprocess.check_output(command).decode()
             JOB_ID = output.replace("\n","").split(' ')[3]
-            self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"S"}          
+            self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"S", "start": time.time()}          
         except subprocess.CalledProcessError as e:
-            self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"F"}
+            logging.error("sbatch failed for task %s: %s", task.uid, e)
 
     def update(self, controller):
         # checking job status
         output = subprocess.getstatusoutput(f"squeue --user={self.user}")[1]
         lines = output.split("\n")
         job_status = {}
-        for l in lines[2:]:                    
+        for l in lines[1:]:                    
             vals = l.split()
             if len(vals)<3:
                 continue
@@ -266,6 +287,10 @@ cd {wd}
         to_remove = []
         for (k,p) in self.processes.items():
             if p["JOB_ID"] not in job_status.keys():
+                # grace period: don't mark as completed until 30s after submission
+                # (squeue may not show the job immediately after sbatch)
+                if time.time() - p["start"] < 30:
+                    continue
                 to_remove.append((k,p))
 
         for (k,p) in to_remove:
