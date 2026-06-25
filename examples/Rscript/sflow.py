@@ -59,11 +59,16 @@ async def flow_Rit():
     """Generate 5 simulation draws, then aggregate."""
 
     # Phase 1: Generate simulation draws (parallel)
+    #
+    # Jobs run in a clean environment, so declare anything beyond `modules` here.
+    # `setup` lines run inside the job, after `module load` and before the command.
+    # (Remove/adapt the example below to match your cluster.)
     tasks = [
         sf.Task(
             cmd=f"Rscript --vanilla gen_results.R {i} {temp_dir}",
             outputs=f"{temp_dir}/res_{i}.RData",
-            name=f"sim-{i}"
+            name=f"sim-{i}",
+            setup=["export R_LIBS_USER=$HOME/R/library"],
         ).set_retry(2)
         for i in range(5)
     ]

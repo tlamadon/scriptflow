@@ -119,6 +119,45 @@ task.set_retry(2)     # retry count on failure
 
 If the output file already exists (and is newer than the inputs), the task is **skipped automatically**.
 
+### Per-task environment setup
+
+Jobs run in a **clean environment** (the Slurm runner submits with `--export=NONE`), so a job
+does not inherit whatever you have loaded/activated in your interactive shell. This keeps runs
+reproducible: everything a job needs is declared in the pipeline, not implicit in your session.
+
+Beyond `module load` (set via the executor's `modules`), a task can declare extra setup commands
+that run **inside the job, after `module load` and before the command** — handy for activating a
+conda environment, pointing R at a user library, or exporting variables:
+
+```python
+sf.Task(
+    cmd="python fine_tune.py",
+    name="fine-tune",
+    setup=[
+        "source $HOME/miniconda3/etc/profile.d/conda.sh",
+        "conda activate myenv",
+    ],
+)
+
+# or via chaining
+sf.Task(cmd="Rscript estimate.R", name="est").set_setup("export R_LIBS_USER=$HOME/R/library")
+```
+
+You can also set a shared `setup` block at the executor level (applied to every job, before each
+task's own `setup`):
+
+```python
+sf.init({
+    "executors": {
+        "slurm": {
+            "maxsize": 50, "account": "my-account", "user": "myuser",
+            "partition": "standard", "modules": "R/4.5", "walltime": "1-00:00:00",
+            "setup": ["export R_LIBS_USER=$HOME/R/library"],   # applies to all jobs
+        }
+    }
+})
+```
+
 ### Flows
 
 Flows are `async` functions prefixed with `flow_`. Use `await` for sequential dependencies and `sf.bag()` for parallel execution:

@@ -110,19 +110,26 @@ class Controller:
     """
     An executor/runner reports a finished task
     """
-    def add_completed(self, task:Task) -> None:
+    def add_completed(self, task:Task, failed:bool=False) -> None:
 
         task.set_prop("finish_time", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
 
-        # retry if output file doesn't exist
-        if (len(task.get_outputs())>0) and (not exists(task.get_outputs()[0])):
+        # a task is a failure if the job reported a non-zero exit code, or if a
+        # declared output file is missing
+        output_missing = (len(task.get_outputs())>0) and (not exists(task.get_outputs()[0]))
+
+        if failed or output_missing:
+
+            reason = "job exited with an error" if failed else "output file missing"
 
             if  task.retry>0:
-                self.log("[red]output file missing for {}, retrying... [/red]".format(task.uid))  
+                self.log("[red]{} for {}, retrying... [/red]".format(reason, task.uid))
                 task.retry = task.retry - 1
                 self.add(task)
             else:
-                self.log("[red]output file missing for {}, failing! [/red]".format(task.uid))  
+                log_hint = task.props.get("log") if hasattr(task, "props") else None
+                hint = " (see [yellow]{}[/yellow])".format(log_hint) if log_hint else ""
+                self.log("[red]{} for {}, failing!{}[/red]".format(reason, task.uid, hint))
                 self.failed = self.failed + 1
                 self.complete_task(task)
 
@@ -158,7 +165,11 @@ class Controller:
 
                 # send it to the executor (one per tick)
                 task.set_prop('start_time',datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-                exec.add(task)
+                submitted = exec.add(task)
+                if submitted is False:
+                    self.log("[red]submission failed for {}, failing! (check account/partition and scriptflow.log)[/red]".format(task.uid))
+                    self.failed = self.failed + 1
+                    self.complete_task(task)
                 return
 
     """

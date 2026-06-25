@@ -12,11 +12,49 @@ from abc import ABC, abstractmethod
 import asyncio
 import logging
 import queue
+import re
 import subprocess
 from datetime import datetime
 from omegaconf import OmegaConf
 import os, tempfile
 import time
+
+def exit_code_from_log(log_path):
+    """Return the job's exit code by reading the `Exit Code: N` line the job script
+    writes at the end of the log, or ``None`` if it can't be determined (log missing,
+    not yet flushed, or the job was killed before writing it). Used to detect job
+    failures that the scheduler reports only via exit status.
+    """
+    try:
+        with open(log_path) as f:
+            text = f.read()
+    except OSError:
+        return None
+    matches = re.findall(r"Exit Code:\s*(-?\d+)", text)
+    if matches:
+        return int(matches[-1])
+    return None
+
+
+def format_setup(*setups):
+    """Combine executor-level and task-level setup into a newline-joined block.
+
+    Each argument may be ``None``, a string, or a list of strings. Empty pieces
+    are skipped. The result is injected into the job script after ``module load``
+    and before the task command, so jobs can declare their own environment
+    (conda activation, ``R_LIBS_USER``, etc.) without inheriting the submitter's
+    interactive shell.
+    """
+    lines = []
+    for s in setups:
+        if not s:
+            continue
+        if isinstance(s, str):
+            lines.append(s)
+        else:
+            lines.extend(s)
+    return "\n".join(lines)
+
 
 class AbstractRunner(ABC):
 
@@ -38,6 +76,7 @@ class CommandRunner(AbstractRunner):
     def __init__(self, conf):
         conf = OmegaConf.create(conf)
         self.max_proc = conf.get('maxsize',4)
+        self.setup = conf.get('setup', [])
         self.processes = {}
 
     def size(self):
@@ -51,20 +90,32 @@ class CommandRunner(AbstractRunner):
     """
     def add(self, task):
 
-        if task.quiet:
-            subp = subprocess.Popen(task.get_command(),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.STDOUT)
+        # run setup (if any) in the same shell as the command
+        setup = format_setup(self.setup, task.get_setup())
+        if setup:
+            command = ["bash", "-c", setup + "\n" + " ".join(task.get_command())]
         else:
-            subp = subprocess.Popen(task.get_command())
-                #stdout=subprocess.DEVNULL,
-                #stderr=subprocess.STDOUT)
+            command = task.get_command()
+
+        try:
+            if task.quiet:
+                subp = subprocess.Popen(command,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.STDOUT)
+            else:
+                subp = subprocess.Popen(command)
+                    #stdout=subprocess.DEVNULL,
+                    #stderr=subprocess.STDOUT)
+        except OSError as e:
+            logging.error("failed to start task %s: %s", task.uid, e)
+            return False
 
         self.processes[task.hash] = {
             "proc" : subp, 
             "task": task , 
             'start_time': datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        }                
+        }
+        return True
 
     """
         Continuously checks on the tasks
@@ -79,12 +130,12 @@ class CommandRunner(AbstractRunner):
         for (k,p) in self.processes.items():
             poll_val = p["proc"].poll()
             if poll_val is not None:
-                to_remove.append(k)
+                to_remove.append((k, poll_val))
 
-        for k in to_remove:
+        for (k, code) in to_remove:
             task = self.processes[k]["task"]
             del self.processes[k]       
-            controller.add_completed( task )
+            controller.add_completed( task, failed=(code != 0) )
 
 
 class HpcRunner(AbstractRunner):
@@ -104,6 +155,7 @@ echo "Start Time: $(date +'%Y-%m-%d %H:%M:%S')"
 echo "----------------------------------------"
 
 module load {modules}
+{setup}
 cd {wd}
 
 {cmd}
@@ -121,6 +173,7 @@ exit $EXIT_CODE
         self.user = conf.user
         self.modules = conf.modules
         self.walltime = conf.walltime
+        self.setup = conf.get('setup', [])
         self.processes = {}
 
         # create log-directory
@@ -143,6 +196,7 @@ exit $EXIT_CODE
             modules = self.modules,
             walltime = self.walltime,
             wd = os.getcwd(), 
+            setup = format_setup(self.setup, task.get_setup()),
             cmd = " ".join(task.get_command()))
 
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.sh')
@@ -150,13 +204,17 @@ exit $EXIT_CODE
         tmp.write(script_content.encode())
         tmp.close()
 
-        command = ["qsub", "-o", f"log/sf-{task.uid}.out", tmp_script_filename]
+        log_path = f"log/sf-{task.uid}.out"
+        task.set_prop("log", log_path)
+        command = ["qsub", "-o", log_path, tmp_script_filename]
         try:
             output = subprocess.check_output(command).decode()
             JOB_ID = output.replace("\n","")
             self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"S", "start": time.time()}          
+            return True
         except subprocess.CalledProcessError as e:
             logging.error("qsub failed for task %s: %s", task.uid, e)
+            return False
 
     def update(self, controller):
 
@@ -184,7 +242,8 @@ exit $EXIT_CODE
 
         for (k, p) in to_remove:
             del self.processes[k]
-            controller.add_completed( p["job"] )
+            code = exit_code_from_log(f"log/sf-{p['job'].uid}.out")
+            controller.add_completed( p["job"], failed=(code is not None and code != 0) )
 
     async def loop(self,controller):
         while True:
@@ -215,6 +274,7 @@ echo "Start Time: $(date +'%Y-%m-%d %H:%M:%S')"
 echo "----------------------------------------"
 
 module load {modules}
+{setup}
 cd {wd}
 
 {cmd}
@@ -235,6 +295,7 @@ exit $EXIT_CODE
         self.partition = conf.partition
         self.modules = conf.modules
         self.walltime = conf.walltime
+        self.setup = conf.get('setup', [])
 
         # create log-directory
         if not os.path.exists("log"):
@@ -254,6 +315,7 @@ exit $EXIT_CODE
                         mem = task.mem,
                         ncore = task.ncore,
                         wd = os.getcwd(), 
+                        setup = format_setup(self.setup, task.get_setup()),
                         cmd = " ".join(task.get_command()),
                         account = self.account,
                         partition = self.partition,
@@ -265,13 +327,17 @@ exit $EXIT_CODE
         tmp.write(script_content.encode())
         tmp.close()
 
-        command = ["sbatch", "--export=NONE", "-o", f"log/sf-{task.uid}.out", tmp_script_filename]
+        log_path = f"log/sf-{task.uid}.out"
+        task.set_prop("log", log_path)
+        command = ["sbatch", "--export=NONE", "-o", log_path, tmp_script_filename]
         try:
             output = subprocess.check_output(command).decode()
             JOB_ID = output.replace("\n","").split(' ')[3]
             self.processes[task.hash] = {"JOB_ID" : JOB_ID, "job": task, "status":"S", "start": time.time()}          
+            return True
         except subprocess.CalledProcessError as e:
             logging.error("sbatch failed for task %s: %s", task.uid, e)
+            return False
 
     def update(self, controller):
         # checking job status
@@ -295,7 +361,8 @@ exit $EXIT_CODE
 
         for (k,p) in to_remove:
             del self.processes[k]
-            controller.add_completed(p["job"])
+            code = exit_code_from_log(f"log/sf-{p['job'].uid}.out")
+            controller.add_completed(p["job"], failed=(code is not None and code != 0))
 
     async def loop(self,controller):
         while True:

@@ -10,3 +10,10 @@ dist/
 .sf
 log
 temp
+
+# AI files
+discussions/
+papers/
+GEMINI.md
+AGENTS.md
+CLAUDE.md

@@ -85,6 +85,15 @@ class Task:
         else:
             self.quiet = True
 
+        # per-task environment setup: shell lines run inside the job, after
+        # `module load` and before the task command. Lets a task declare its own
+        # environment (conda activation, R_LIBS_USER, etc.) without inheriting the
+        # submitter's interactive shell.
+        if "setup" in kwargs.keys():
+            self.setup = self._as_lines(kwargs["setup"])
+        else:
+            self.setup = []
+
         self.hash = ""
         self.return_file = ""
 
@@ -126,6 +135,22 @@ class Task:
     def set_cpu(self, ncore):
         self.ncore = ncore    
         return self
+
+    @staticmethod
+    def _as_lines(setup):
+        if setup is None:
+            return []
+        if isinstance(setup, str):
+            return [setup]
+        return list(setup)
+
+    def set_setup(self, setup):
+        """Shell lines run inside the job before the task command (e.g. `conda activate env`)."""
+        self.setup = self._as_lines(setup)
+        return self
+
+    def get_setup(self):
+        return self.setup
 
     def input(self, input_file):
         # check that the input file actually exist and extract its values, too soon?
