@@ -19,6 +19,8 @@ from omegaconf import OmegaConf
 import os, tempfile
 import time
 
+from .container import ContainerSpec, render_command
+
 def exit_code_from_log(log_path):
     """Return the job's exit code by reading the `Exit Code: N` line the job script
     writes at the end of the log, or ``None`` if it can't be determined (log missing,
@@ -77,6 +79,7 @@ class CommandRunner(AbstractRunner):
         conf = OmegaConf.create(conf)
         self.max_proc = conf.get('maxsize',4)
         self.setup = conf.get('setup', [])
+        self.container = ContainerSpec.from_conf(conf.get('container', None))
         self.processes = {}
 
     def size(self):
@@ -90,12 +93,12 @@ class CommandRunner(AbstractRunner):
     """
     def add(self, task):
 
-        # run setup (if any) in the same shell as the command
+        # resolve the command (wrapped into the container if one is configured) and run it
+        # through a shell so snippet operators (&&, pipes, ...) and setup lines work.
+        line = render_command(task, self.container)
         setup = format_setup(self.setup, task.get_setup())
-        if setup:
-            command = ["bash", "-c", setup + "\n" + " ".join(task.get_command())]
-        else:
-            command = task.get_command()
+        inner = setup + "\n" + line if setup else line
+        command = ["bash", "-c", inner]
 
         try:
             if task.quiet:
@@ -154,8 +157,7 @@ echo "Node: $(hostname)"
 echo "Start Time: $(date +'%Y-%m-%d %H:%M:%S')"
 echo "----------------------------------------"
 
-module load {modules}
-{setup}
+{modline}{setup}
 cd {wd}
 
 {cmd}
@@ -174,6 +176,7 @@ exit $EXIT_CODE
         self.modules = conf.modules
         self.walltime = conf.walltime
         self.setup = conf.get('setup', [])
+        self.container = ContainerSpec.from_conf(conf.get('container', None))
         self.processes = {}
 
         # create log-directory
@@ -186,18 +189,25 @@ exit $EXIT_CODE
     def available_slots(self):
         return self.max_proc - len(self.processes)
 
-    def add(self, task):
-
-        # create the script
-        script_content = self.script_template.format(
+    def build_script(self, task):
+        # the runtime binary (e.g. apptainer) is a host concern: only emit a module-load
+        # line when modules are configured, so an empty string does not produce a bare
+        # `module load`.
+        modline = f"module load {self.modules}\n" if self.modules else ""
+        return self.script_template.format(
             name = "sf-{}".format(task.uid),
             mem = task.mem,
             procs = task.ncore,
-            modules = self.modules,
+            modline = modline,
             walltime = self.walltime,
-            wd = os.getcwd(), 
+            wd = os.getcwd(),
             setup = format_setup(self.setup, task.get_setup()),
-            cmd = " ".join(task.get_command()))
+            cmd = render_command(task, self.container))
+
+    def add(self, task):
+
+        # create the script
+        script_content = self.build_script(task)
 
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.sh')
         tmp_script_filename = tmp.name
@@ -273,8 +283,7 @@ echo "Memory per CPU: $SLURM_MEM_PER_CPU"
 echo "Start Time: $(date +'%Y-%m-%d %H:%M:%S')"
 echo "----------------------------------------"
 
-module load {modules}
-{setup}
+{modline}{setup}
 cd {wd}
 
 {cmd}
@@ -296,6 +305,7 @@ exit $EXIT_CODE
         self.modules = conf.modules
         self.walltime = conf.walltime
         self.setup = conf.get('setup', [])
+        self.container = ContainerSpec.from_conf(conf.get('container', None))
 
         # create log-directory
         if not os.path.exists("log"):
@@ -307,20 +317,27 @@ exit $EXIT_CODE
     def available_slots(self):
         return self.max_proc - len(self.processes)
 
+    def build_script(self, task):
+        # the runtime binary (e.g. apptainer) is a host concern: only emit a module-load
+        # line when modules are configured, so an empty string does not produce a bare
+        # `module load`.
+        modline = f"module load {self.modules}\n" if self.modules else ""
+        return self.script_template.format(
+            name = "{}".format(task.uid),
+            mem = task.mem,
+            ncore = task.ncore,
+            wd = os.getcwd(),
+            setup = format_setup(self.setup, task.get_setup()),
+            cmd = render_command(task, self.container),
+            account = self.account,
+            partition = self.partition,
+            modline = modline,
+            walltime = self.walltime)
+
     def add(self, task):
 
         # create the script
-        script_content = self.script_template.format(
-                        name = "{}".format(task.uid),
-                        mem = task.mem,
-                        ncore = task.ncore,
-                        wd = os.getcwd(), 
-                        setup = format_setup(self.setup, task.get_setup()),
-                        cmd = " ".join(task.get_command()),
-                        account = self.account,
-                        partition = self.partition,
-                        modules = self.modules,
-                        walltime = self.walltime)
+        script_content = self.build_script(task)
 
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.sh')
         tmp_script_filename = tmp.name

@@ -7,7 +7,7 @@ readme = "README.md"
 repository = "https://github.com/tlamadon/scriptflow"
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.8"
 rich = "^11.0.0"
 toml = "^0.10.2"
 click = "^8.0.3"

@@ -41,12 +41,23 @@ class Task:
         self.fut = None
         self.state = "init"
 
+        # cmd_raw is the original shell snippet (may contain &&, pipes, quotes); cmd is its
+        # tokenized form, kept for hashing/inspection. Runners execute cmd_raw verbatim so
+        # shell operators and quoting are preserved (see scriptflow.container).
+        self.cmd_raw = ""
         if "cmd" in kwargs.keys():
             # we check if we have a string, in which case we try to split it
             if isinstance(kwargs["cmd"], str):
                 self.cmd = shlex.split(kwargs["cmd"])
+                self.cmd_raw = kwargs["cmd"]
             else:
                 self.cmd  = kwargs["cmd"]
+                # a list input is a genuine argv: join it into a shell-safe snippet
+                self.cmd_raw = shlex.join(kwargs["cmd"])
+
+        # whether this task may run inside the executor's container (if one is configured).
+        # Set container=False for host-only tasks, e.g. jobs that build the image itself.
+        self.use_container = bool(kwargs.get("container", True))
 
         if "controller" in kwargs.keys():
             self.controller  = kwargs["controller"]
@@ -180,6 +191,10 @@ class Task:
 
     def get_command(self):
         return self.cmd
+
+    def get_command_str(self):
+        """The original shell snippet, executed verbatim by runners."""
+        return self.cmd_raw
 
     def set_prop(self,name,value):
         self.props[name]=value
