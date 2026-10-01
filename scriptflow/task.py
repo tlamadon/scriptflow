@@ -4,6 +4,7 @@ import asyncio
 import shlex
 
 from .glob import get_main_controller
+from .container import ContainerSpec
 
 
 
@@ -55,9 +56,18 @@ class Task:
                 # a list input is a genuine argv: join it into a shell-safe snippet
                 self.cmd_raw = shlex.join(kwargs["cmd"])
 
-        # whether this task may run inside the executor's container (if one is configured).
-        # Set container=False for host-only tasks, e.g. jobs that build the image itself.
-        self.use_container = bool(kwargs.get("container", True))
+        # Container the task runs in. Default is the host (no container); pass a
+        # `ContainerSpec` (or a dict, built via `ContainerSpec.from_conf`) to run inside
+        # one. There is no executor-level default: bare True/False both mean host.
+        c = kwargs.get("container", None)
+        if c is None or c is False or c is True:
+            self.container_spec = None
+        elif isinstance(c, ContainerSpec):
+            self.container_spec = c
+        elif isinstance(c, dict):
+            self.container_spec = ContainerSpec.from_conf(c)
+        else:
+            raise TypeError("container= must be a ContainerSpec, dict, or None")
 
         if "controller" in kwargs.keys():
             self.controller  = kwargs["controller"]

@@ -19,7 +19,7 @@ from omegaconf import OmegaConf
 import os, tempfile
 import time
 
-from .container import ContainerSpec, render_command
+from .container import render_command
 
 def exit_code_from_log(log_path):
     """Return the job's exit code by reading the `Exit Code: N` line the job script
@@ -79,7 +79,6 @@ class CommandRunner(AbstractRunner):
         conf = OmegaConf.create(conf)
         self.max_proc = conf.get('maxsize',4)
         self.setup = conf.get('setup', [])
-        self.container = ContainerSpec.from_conf(conf.get('container', None))
         self.processes = {}
 
     def size(self):
@@ -93,9 +92,9 @@ class CommandRunner(AbstractRunner):
     """
     def add(self, task):
 
-        # resolve the command (wrapped into the container if one is configured) and run it
+        # resolve the command (wrapped into the task's container if it has one) and run it
         # through a shell so snippet operators (&&, pipes, ...) and setup lines work.
-        line = render_command(task, self.container)
+        line = render_command(task)
         setup = format_setup(self.setup, task.get_setup())
         inner = setup + "\n" + line if setup else line
         command = ["bash", "-c", inner]
@@ -176,7 +175,6 @@ exit $EXIT_CODE
         self.modules = conf.modules
         self.walltime = conf.walltime
         self.setup = conf.get('setup', [])
-        self.container = ContainerSpec.from_conf(conf.get('container', None))
         self.processes = {}
 
         # create log-directory
@@ -202,7 +200,7 @@ exit $EXIT_CODE
             walltime = self.walltime,
             wd = os.getcwd(),
             setup = format_setup(self.setup, task.get_setup()),
-            cmd = render_command(task, self.container))
+            cmd = render_command(task))
 
     def add(self, task):
 
@@ -305,7 +303,6 @@ exit $EXIT_CODE
         self.modules = conf.modules
         self.walltime = conf.walltime
         self.setup = conf.get('setup', [])
-        self.container = ContainerSpec.from_conf(conf.get('container', None))
 
         # create log-directory
         if not os.path.exists("log"):
@@ -328,7 +325,7 @@ exit $EXIT_CODE
             ncore = task.ncore,
             wd = os.getcwd(),
             setup = format_setup(self.setup, task.get_setup()),
-            cmd = render_command(task, self.container),
+            cmd = render_command(task),
             account = self.account,
             partition = self.partition,
             modline = modline,
