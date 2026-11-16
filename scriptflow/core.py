@@ -21,6 +21,7 @@ from os.path import exists
 from omegaconf import OmegaConf
 
 from .task import Task
+from .records import RunRecord
 from .runners import *
 from .glob import *
 
@@ -39,16 +40,14 @@ console = Console()
 
 # ["python", "-c", "import time; time.sleep(3); print('done')"]
 
+class TaskFailed(RuntimeError):
+    """Raised at `await` of a task that failed with no retry left."""
+
+class RunCancelled(RuntimeError):
+    pass
+
 def bag(*args, **kwargs):
     return(asyncio.gather(*args, **kwargs))
-
-def _handle_task_result(task: asyncio.Task) -> None:
-    try:
-        task.result()
-    except asyncio.CancelledError:
-        pass  # Task cancellation should not be logged as an error.
-    except Exception:  # pylint: disable=broad-except
-        logging.exception('Exception raised by task = %r', task)
 
 from rich.console import Console
 from time import sleep
@@ -71,6 +70,10 @@ class Controller:
     def __init__(self, conf = {}, runner = None) -> None:
         conf = OmegaConf.create(conf)
         self.task_queue = queue.Queue()
+        self.tasks  = {}
+        self.record = None
+        self.heartbeat_at = 0
+        self.record_failed = False
         self.done   = 0
         self.retry  = 0
         self.failed = 0
@@ -93,9 +96,42 @@ class Controller:
             self.executors = { "local": CommandRunner({'maxsize':4}) }
 
     """
+    Start the persisted record of this run, see records.py
+    """
+    def start_record(self, flow, run_id=None, root=".sf/runs"):
+        self.record = RunRecord(flow, run_id, root)
+        for task in self.tasks.values():
+            self.record_task(task)
+
+    def record_task(self, task, flush=False):
+        if self.record is not None:
+            self.record.task(task)
+            if flush:
+                self.record.save()
+
+    # pending changes are written once per tick, the heartbeat every 2s;
+    # a failed write is retried at the next heartbeat
+    def sync_record(self):
+        beat = time.monotonic() >= self.heartbeat_at
+        try:
+            if beat:
+                self.record.heartbeat()
+            elif self.record.dirty and not self.record_failed:
+                self.record.save()
+            self.record_failed = False
+        except OSError as e:
+            self.record_failed = True
+            self.logger.warning("run record not written: %s", e)
+        if beat:
+            self.heartbeat_at = time.monotonic() + 2
+
+    """
     The user tells us that a task should be added
     """
     def add(self, task:Task):
+
+        if self.shut_me_down:
+            raise RunCancelled("controller is stopping")
 
         # check if the task is up to date, 
         # this allows to skip the task right away!
@@ -105,7 +141,15 @@ class Controller:
         # -> this is done at the time the task is send to the executor
 
         # otherwise, we add the task to the queue
+        self.tasks[task.execution_id] = task
+        task.report("pending")
         self.task_queue.put(task)
+
+    def fail_task(self, task:Task, reason:str) -> None:
+        self.failed = self.failed + 1
+        task.report("failed", error=reason)
+        if not task.fut.done():
+            task.fut.set_exception(TaskFailed("{}: {}".format(task.uid, reason)))
 
     """
     An executor/runner reports a finished task
@@ -116,11 +160,11 @@ class Controller:
 
         # a task is a failure if the job reported a non-zero exit code, or if a
         # declared output file is missing
-        output_missing = (len(task.get_outputs())>0) and (not exists(task.get_outputs()[0]))
+        output_missing = [f for f in task.get_outputs() if not exists(f)]
 
         if failed or output_missing:
 
-            reason = "job exited with an error" if failed else "output file missing"
+            reason = "job exited with an error" if failed else "output file missing: " + ", ".join(output_missing)
 
             if  task.retry>0:
                 self.log("[red]{} for {}, retrying... [/red]".format(reason, task.uid))
@@ -130,8 +174,7 @@ class Controller:
                 log_hint = task.props.get("log") if hasattr(task, "props") else None
                 hint = " (see [yellow]{}[/yellow])".format(log_hint) if log_hint else ""
                 self.log("[red]{} for {}, failing!{}[/red]".format(reason, task.uid, hint))
-                self.failed = self.failed + 1
-                self.complete_task(task)
+                self.fail_task(task, reason)
 
         # everything normal
         else:
@@ -160,7 +203,7 @@ class Controller:
                 # check if the task is up to date, 
                 # this allows to skip the task right away!
                 if self.check_task_uptodate(task):
-                    self.complete_task(task)
+                    self.complete_task(task, state="skipped")
                     continue
 
                 # send it to the executor (one per tick)
@@ -168,8 +211,7 @@ class Controller:
                 submitted = exec.add(task)
                 if submitted is False:
                     self.log("[red]submission failed for {}, failing! (check account/partition and scriptflow.log)[/red]".format(task.uid))
-                    self.failed = self.failed + 1
-                    self.complete_task(task)
+                    self.fail_task(task, "submission failed")
                 return
 
     """
@@ -184,10 +226,10 @@ class Controller:
             return(False)
 
         # checking if the task needs to be redone
-        if len(task.get_outputs())>0 and os.path.exists( task.get_outputs()[0] ):
+        outputs = task.get_outputs()
+        if len(outputs)>0 and all(os.path.exists(f) for f in outputs):
             # console.log("checking {}".format(j.output_file))
-            output_time = os.path.getmtime(task.get_outputs()[0])  
-            # fixme, get the date of the most recent output
+            output_time = min(os.path.getmtime(f) for f in outputs)
 
             UP_TO_DATE = True
             for f in task.deps:
@@ -206,20 +248,36 @@ class Controller:
         self.log(" - cmd: {}".format( " ".join(task.get_command() ) ))
         return(False)
 
-    def complete_task(self, task):
+    def complete_task(self, task, state="completed"):
         # mark the promise as completed and set it to itself
         assert asyncio.isfuture(task.fut)
         assert not task.fut.done()
         task.set_completed()
+        task.report(state)
 
     async def start_loops(self):
-        for exec in self.executors.values():
-            co_task = asyncio.create_task(exec.loop(self))
-            co_task.add_done_callback(_handle_task_result)
+        workers = [asyncio.create_task(exec.loop(self)) for exec in self.executors.values()]
+        try:
+            await self.main_loop(workers)
+        finally:
+            for worker in workers:
+                worker.cancel()
+
+    async def main_loop(self, workers):
 
         # run my own event loop
         with console.status("Running ...") as status:
             while True:
+
+                # an executor loop only ends by raising
+                for worker in workers:
+                    if worker.done():
+                        worker.result()
+
+                if self.record is not None:
+                    if (self.record.path / "cancel.json").exists():
+                        raise RunCancelled("cancellation requested")
+                    self.sync_record()
 
                 # logging messages
                 while not self.msg_queue.empty():
@@ -240,6 +298,30 @@ class Controller:
 
                 await asyncio.sleep(0.1)
 
+    """
+    Stop admitting tasks and cancel what the executors still run.
+    Returns True while some job lacks confirmation that it ended.
+    """
+    async def stop(self):
+        self.shut_me_down = True
+        unresolved = False
+        for exec in self.executors.values():
+            try:
+                unresolved = bool(exec.cancel()) or unresolved
+            except Exception:
+                self.logger.exception("executor cleanup failed")
+                unresolved = True
+        for task in self.tasks.values():
+            if not task.fut.done():
+                task.fut.cancel()
+            elif not task.fut.cancelled():
+                # retrieved here so an unawaited failure is not reported at exit
+                task.fut.exception()
+            if task.state == "pending":
+                task.state = "cancelled"
+            self.record_task(task)
+        return unresolved
+
     async def update_loop(self):
         while self.shut_me_down==False:
             self.update()
@@ -257,6 +339,8 @@ class Controller:
     called when flow finishes
     """
     def last_word(self):
+        while not self.msg_queue.empty():
+            console.log(self.msg_queue.get())
         console.log("--------------------------------")
         console.log("Thank you for using scriptflow!")
         console.log("You ran {} tasks with {} fails.".format(self.done, self.failed))
@@ -271,5 +355,5 @@ def init(dict):
     logging.basicConfig(filename='scriptflow.log', level=logging.DEBUG)
 
     set_main_controller(Controller(conf))
-    if conf.debug:
+    if conf.get('debug'):
         asyncio.get_event_loop().set_debug(True)

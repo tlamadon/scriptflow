@@ -217,34 +217,84 @@ When you run scriptflow, the following files are created in your project directo
 | File/Dir | Purpose |
 |---|---|
 | `sflow.py` | Your pipeline definition (you create this) |
-| `log/` | One `.out` file per job with stdout/stderr |
+| `.sf/runs/<run-id>/run.json` | Versioned workflow/task/attempt status and scheduler identities |
+| `.sf/runs/<run-id>/logs/` | Separate stdout/stderr log and scheduler script for each attempt |
 | `scriptflow.log` | Internal debug log |
 
-To remove all auto-generated files and start fresh:
+To remove all auto-generated files and start fresh (this deletes the run records in `.sf/` too):
 
 ```bash
 scriptflow clean
 ```
 
-## Using tmux
+## Using tmux on a compute node
 
-Since scriptflow runs on the head node and monitors job progress, use [tmux](http://tmuxcheatsheet.com/) to keep it running after you disconnect:
+Request an interactive compute allocation using your cluster's usual command, enter the
+allocated node, then start tmux and activate the environment:
 
 ```bash
-# Start a new tmux session
 tmux
-
-# Activate your venv and run scriptflow as usual
-source env/bin/activate
-cd my_project/
+source /path/to/env/bin/activate
+cd /path/to/project
 scriptflow run analysis
-
-# Detach from the session (scriptflow keeps running):
-#   press Ctrl+B, then D
-
-# Reconnect later:
-tmux a -t 0
 ```
+
+Detach with Ctrl+B, then D; reattach to that session on the same compute node with
+`tmux attach`. ScriptFlow runs independently of ScriptHut. Its Slurm/PBS executors
+continue submitting separate task jobs. tmux preserves the session across terminal
+disconnection, but does not extend the compute allocation's lifetime.
+
+## Run records
+
+Every `scriptflow run` prints a run ID and keeps a record in `.sf/runs/<run-id>/`:
+`run.json` with the state of the run, its tasks and each submission attempt, and one log
+per attempt in `logs/`. The format is described at the top of `scriptflow/records.py`.
+
+```bash
+scriptflow run analysis --run-id analysis-001   # an existing ID is rejected
+scriptflow inspect analysis-001 --json          # reads the record only
+scriptflow cancel analysis-001                  # ask the controller to stop
+scriptflow cleanup analysis-001                 # after the controller has died
+```
+
+`--runs-dir` selects another record root on all four commands. Without `--run-id` a
+random ID is used.
+
+- `inspect` never imports `sflow.py` or queries the scheduler. It adds `observation`:
+  heartbeat age, a `stale` flag after 30 seconds, and whether cancellation was requested.
+  A stale heartbeat means the controller may be gone, not that the run ended.
+- `cancel` returns once the request is written. The controller then stops submitting and
+  cancels its jobs; SIGINT and SIGTERM do the same. `cleanup_pending` in the record stays
+  true until every job is confirmed ended.
+- `cleanup` refuses a run whose controller is alive. It cancels the jobs the record still
+  lists and exits 1 while any is unconfirmed; run it again once the scheduler has caught
+  up. Local processes can only be cleaned up on the host that started them. It does not
+  resume the flow.
+
+## Failures
+
+A task that fails with no retry left raises `scriptflow.TaskFailed` at its `await`, so
+the code after it does not run. The run then exits 1, as does an unknown flow name, a
+cancelled or an interrupted run. A task counts as failed when its job exits nonzero or
+any declared output is missing; it is skipped only when every output exists and is at
+least as recent as every input.
+
+Each attempt is submitted under a unique job name, recorded before the scheduler is
+contacted. If the scheduler's reply is lost, the attempt shows `unknown` and is found
+again by that name; it is not resubmitted.
+
+Job status comes from one listing per poll (`squeue --states=all --user=<user>` for
+Slurm, `qstat -f` for PBS). An attempt ends on:
+
+1. a terminal state reported by the scheduler;
+2. otherwise, once the job is absent from a successful listing, the `Exit Code: N` line
+   the job script writes at the end of its log;
+3. otherwise, after the job has been absent for `grace` seconds (executor option,
+   default 300), as a failure.
+
+A failed listing is never evidence: the attempt shows `unknown` and no clock advances.
+Rule 3 means a job the scheduler accepted but never lists, and that is still running
+after `grace` seconds, is treated as failed and may be retried while it runs.
 
 ## Example
 

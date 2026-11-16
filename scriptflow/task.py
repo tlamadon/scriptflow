@@ -2,6 +2,7 @@
 import hashlib
 import asyncio
 import shlex
+import uuid
 
 from .glob import get_main_controller
 from .container import ContainerSpec
@@ -41,6 +42,10 @@ class Task:
 
         self.fut = None
         self.state = "init"
+
+        # execution_id identifies the task within a run; one attempt per submission
+        self.execution_id = uuid.uuid4().hex
+        self.attempts = []
 
         # cmd_raw is the original shell snippet (may contain &&, pipes, quotes); cmd is its
         # tokenized form, kept for hashing/inspection. Runners execute cmd_raw verbatim so
@@ -222,10 +227,18 @@ class Task:
         self.state = "scheduled"
 
     def is_scheduled(self):
-        return(self.state == "scheduled")
+        return self.fut is not None
 
     def set_state_completed(self):
         self.state = "completed"
+
+    def report(self, state=None, flush=False, **props):
+        """Update state/props and mirror the task into the run record."""
+        if state is not None:
+            self.state = state
+        self.props.update(props)
+        if self.controller is not None:
+            self.controller.record_task(self, flush=flush)
 
     def set_completed(self):
         self.fut.set_result(self)

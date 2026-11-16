@@ -8,7 +8,9 @@ import pytest
 import asyncio
 
 
-def test_controller_init(event_loop):
+@pytest.mark.asyncio
+async def test_controller_init():
+    event_loop = asyncio.get_running_loop()
 
     task1 = Mock(**{
         'outputs':{None:['tmp.txt']},
@@ -56,7 +58,9 @@ def test_controller_init(event_loop):
     controller.add_completed(task2)
     task2.set_completed.assert_called()
 
-def test_controller_retry(event_loop):
+@pytest.mark.asyncio
+async def test_controller_retry():
+    event_loop = asyncio.get_running_loop()
 
     task1 = Mock(**{
         'outputs' : {None:["tmp.txt"]},
@@ -89,6 +93,24 @@ def test_controller_retry(event_loop):
     controller.update()
     controller.add_completed(task1)
 
-    # check that task was completed
-    task1.set_completed.assert_called()
-    controller.add_completed(task1)
+    # the retry is used up: the task fails
+    task1.set_completed.assert_not_called()
+    assert isinstance(task1.fut.exception(), sf.core.TaskFailed)
+    assert controller.failed == 1
+
+
+def test_all_outputs_and_oldest_output_checked(tmp_path):
+    import os
+    controller = Controller()
+    first, second, source = (tmp_path / name for name in ("first", "second", "source"))
+    first.touch()
+    source.touch()
+    task = sf.Task(cmd="true", outputs=[str(first), str(second)], inputs=str(source))
+    assert not controller.check_task_uptodate(task)
+    second.touch()
+    os.utime(first, (300, 300))
+    os.utime(second, (100, 100))
+    os.utime(source, (200, 200))
+    assert not controller.check_task_uptodate(task)
+    os.utime(second, (300, 300))
+    assert controller.check_task_uptodate(task)

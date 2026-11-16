@@ -10,13 +10,13 @@ import asyncio
 import pytest_asyncio
 
 @pytest_asyncio.fixture
-async def controller(event_loop):
+async def controller():
 
     runner = Mock(**{
         'available_slots.return_value' : 1})
 
     controller:sf.code.Controller = sf.core.Controller(runner=runner)
-    controller.loop = event_loop.create_task(controller.update_loop(), name="controller")
+    controller.loop = asyncio.get_running_loop().create_task(controller.update_loop(), name="controller")
     yield controller 
     await controller.shutdown()   
 

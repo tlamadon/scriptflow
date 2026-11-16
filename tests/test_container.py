@@ -219,6 +219,7 @@ def test_local_runner_wraps_via_bash(monkeypatch):
     class FakePopen:
         def __init__(self, argv, **kwargs):
             captured['argv'] = argv
+            self.pid = 99999999
         def poll(self):
             return None
 
