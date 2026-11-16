@@ -64,6 +64,7 @@ def format_setup(*setups):
 
 COMMAND_TIMEOUT = 10   # seconds, for any scheduler command
 GRACE = 300            # seconds a job may be missing from the scheduler before it is failed
+OUTPUT_WAIT = 60       # seconds a finished job's outputs may take to appear on this host
 SETTLED = {"completed", "failed", "cancelled", "interrupted"}
 CANCEL = {"slurm": "scancel", "pbs": "qdel"}
 SLURM_FAILED = {"FAILED", "TIMEOUT", "OUT_OF_MEMORY", "NODE_FAIL", "PREEMPTED",
@@ -386,6 +387,8 @@ class SchedulerRunner(AbstractRunner):
             if rows is None:
                 attempt.update(state="unknown", error=error)
             elif settle(attempt, rows, self.grace):
+                if attempt["state"] == "completed" and not self.outputs_arrived(p):
+                    continue
                 del self.processes[k]
                 controller.add_completed(task, failed=(attempt["state"] != "completed"))
                 continue
@@ -393,6 +396,21 @@ class SchedulerRunner(AbstractRunner):
                 if attempt["state"] == "unknown":
                     controller.log("[yellow]scheduler status unknown for {}: {}[/yellow]".format(task.uid, attempt["error"]))
                 task.report(attempt["state"])
+
+    def outputs_arrived(self, p):
+        """True once the task's outputs are visible here, or `output_wait` seconds have passed.
+
+        A file written on another node can lag on a network filesystem; listing its
+        directory makes the client look again.
+        """
+        deadline = p.setdefault("outputs_by", time.time() + self.output_wait)
+        outputs = p["job"].get_outputs()
+        for directory in {os.path.dirname(f) or "." for f in outputs if not os.path.exists(f)}:
+            try:
+                os.listdir(directory)
+            except OSError:
+                pass
+        return all(os.path.exists(f) for f in outputs) or time.time() >= deadline
 
     def update(self, controller):
         self.apply(controller, *self.poll())
@@ -456,6 +474,7 @@ exit $EXIT_CODE
         self.walltime = conf.walltime
         self.setup = conf.get('setup', [])
         self.grace = conf.get('grace', GRACE)
+        self.output_wait = conf.get('output_wait', OUTPUT_WAIT)
         self.processes = {}
 
         # create log-directory
@@ -537,6 +556,7 @@ exit $EXIT_CODE
         self.walltime = conf.walltime
         self.setup = conf.get('setup', [])
         self.grace = conf.get('grace', GRACE)
+        self.output_wait = conf.get('output_wait', OUTPUT_WAIT)
 
         # create log-directory
         if not os.path.exists("log"):

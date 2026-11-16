@@ -82,6 +82,42 @@ async def test_query_errors_and_absence_do_not_complete_task(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_finished_job_waits_for_its_outputs(monkeypatch):
+    runner = slurm()
+    controller = Controller(runner=runner)
+    task = Task(cmd="true", outputs="late.txt", controller=controller).schedule()
+    monkeypatch.setattr(subprocess, "check_output", Mock(return_value=b"Submitted batch job 123"))
+    controller.update()
+    token = task.attempts[-1]["submission_token"]
+    monkeypatch.setattr(subprocess, "check_output",
+                        Mock(return_value=f"123|{token}|COMPLETED\n".encode()))
+    runner.update(controller)
+    assert task.attempts[-1]["state"] == "completed"
+    assert not task.fut.done()
+    assert runner.size() == 1
+    Path("late.txt").touch()
+    runner.update(controller)
+    assert await task is task
+    assert runner.size() == 0
+
+
+@pytest.mark.asyncio
+async def test_outputs_still_missing_after_wait_fail(monkeypatch):
+    runner = slurm()
+    runner.output_wait = 0
+    controller = Controller(runner=runner)
+    task = Task(cmd="true", outputs="never.txt", controller=controller).schedule()
+    monkeypatch.setattr(subprocess, "check_output", Mock(return_value=b"Submitted batch job 123"))
+    controller.update()
+    token = task.attempts[-1]["submission_token"]
+    monkeypatch.setattr(subprocess, "check_output",
+                        Mock(return_value=f"123|{token}|COMPLETED\n".encode()))
+    runner.update(controller)
+    with pytest.raises(TaskFailed, match="never.txt"):
+        await task
+
+
+@pytest.mark.asyncio
 async def test_one_listing_per_poll(monkeypatch):
     runner = slurm()
     runner.max_proc = 50
