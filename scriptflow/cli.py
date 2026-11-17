@@ -95,6 +95,15 @@ def cli():
 @click.option('--runs-dir', default='.sf/runs', show_default=True, type=click.Path())
 def run(name="",force=None,run_id=None,runs_dir=".sf/runs",load="sflow.py"):
 
+    # an existing run is rejected before the flow file is imported
+    if run_id is not None:
+        try:
+            taken = run_path(run_id, runs_dir).exists()
+        except ValueError as e:
+            raise click.ClickException(str(e))
+        if taken:
+            raise click.ClickException("Run '{}' already exists".format(run_id))
+
     foo = load_local_file("sflow.py")
 
     func_names = {k:v for (k,v) in getmembers(foo, isfunction)}

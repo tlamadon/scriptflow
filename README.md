@@ -294,7 +294,7 @@ Slurm, `qstat -f` for PBS). An attempt ends on:
 
 A failed listing is never evidence: the attempt shows `unknown` and no clock advances.
 A job that finished successfully is only checked for its outputs once they are visible
-on the controller's host, or after `output_wait` seconds (executor option, default 60):
+on the controller's host, or after `output_wait` seconds (executor option, default 120):
 files written on another node can take a while to appear on a network filesystem.
 Rule 3 means a job the scheduler accepted but never lists, and that is still running
 after `grace` seconds, is treated as failed and may be retried while it runs.

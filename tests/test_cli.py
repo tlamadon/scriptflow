@@ -70,6 +70,16 @@ def test_unknown_flow_and_duplicate_identity_fail():
     assert runner.invoke(cli, ["run", "test", "--run-id", "../escape"]).exit_code == 1
 
 
+def test_existing_run_id_is_rejected_before_importing_the_flow():
+    write_flow("    pass\n")
+    runner = CliRunner()
+    assert runner.invoke(cli, ["run", "test", "--run-id", "once"]).exit_code == 0
+    Path("sflow.py").write_text("raise Exception('must not import')")
+    result = runner.invoke(cli, ["run", "test", "--run-id", "once"])
+    assert result.exit_code == 1
+    assert "already exists" in result.output
+
+
 def test_retry_logs_and_attempts():
     write_flow("    await sf.Task(cmd='if [ -f flag ]; then echo ok; else touch flag; exit 1; fi').set_retry(1)\n")
     result = CliRunner().invoke(cli, ["run", "test", "--run-id", "retry"])

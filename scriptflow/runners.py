@@ -64,7 +64,7 @@ def format_setup(*setups):
 
 COMMAND_TIMEOUT = 10   # seconds, for any scheduler command
 GRACE = 300            # seconds a job may be missing from the scheduler before it is failed
-OUTPUT_WAIT = 60       # seconds a finished job's outputs may take to appear on this host
+OUTPUT_WAIT = 120      # seconds a finished job's outputs may take to appear on this host
 SETTLED = {"completed", "failed", "cancelled", "interrupted"}
 CANCEL = {"slurm": "scancel", "pbs": "qdel"}
 SLURM_FAILED = {"FAILED", "TIMEOUT", "OUT_OF_MEMORY", "NODE_FAIL", "PREEMPTED",
