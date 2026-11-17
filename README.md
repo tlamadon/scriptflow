@@ -264,8 +264,8 @@ random ID is used.
   heartbeat age, a `stale` flag after 30 seconds, and whether cancellation was requested.
   A stale heartbeat means the controller may be gone, not that the run ended.
 - `cancel` returns once the request is written. The controller then stops submitting and
-  cancels its jobs; SIGINT and SIGTERM do the same. `cleanup_pending` in the record stays
-  true until every job is confirmed ended.
+  cancels its jobs; SIGINT and SIGTERM do the same. It waits up to 30 seconds for the
+  scheduler to confirm; `cleanup_pending` stays true if a job is still unconfirmed then.
 - `cleanup` refuses a run whose controller is alive. It cancels the jobs the record still
   lists and exits 1 while any is unconfirmed; run it again once the scheduler has caught
   up. Local processes can only be cleaned up on the host that started them. It does not

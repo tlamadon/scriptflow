@@ -222,6 +222,31 @@ async def test_cancellation_stops_local_jobs_and_queued_tasks():
 
 
 @pytest.mark.asyncio
+async def test_cancel_waits_for_scheduler_confirmation(monkeypatch):
+    runner = slurm()
+    controller = Controller(runner=runner)
+    task = Task(cmd="true", controller=controller).schedule()
+    listings = []
+
+    def scheduler(argv, **kwargs):
+        if argv[0] == "sbatch":
+            return b"Submitted batch job 123"
+        if argv[0] == "scancel":
+            return b""
+        token = task.attempts[-1]["submission_token"]
+        listings.append(argv)
+        state = "RUNNING" if len(listings) < 3 else "CANCELLED"
+        return f"123|{token}|{state}\n".encode()
+
+    monkeypatch.setattr(subprocess, "check_output", scheduler)
+    monkeypatch.setattr(time, "sleep", lambda seconds: None)
+    controller.update()
+    assert not await controller.stop()
+    assert task.attempts[-1]["state"] == "cancelled"
+    assert runner.size() == 0
+
+
+@pytest.mark.asyncio
 async def test_scheduler_cleanup_remains_pending_until_confirmed(monkeypatch):
     runner = slurm()
     controller = Controller(runner=runner)
@@ -241,6 +266,7 @@ async def test_scheduler_cleanup_remains_pending_until_confirmed(monkeypatch):
     monkeypatch.setattr(subprocess, "check_output", scheduler)
     controller.update()
     token = task.attempts[-1]["submission_token"]
+    monkeypatch.setattr("scriptflow.runners.CANCEL_WAIT", 0)
     assert await controller.stop()
     controller.record.finish("cancelled", cleanup_pending=True)
     controller.record.close()
@@ -390,6 +416,7 @@ async def test_cancel_during_submission_preserves_accepted_job(monkeypatch):
         raise AssertionError(argv)
 
     monkeypatch.setattr(subprocess, "check_output", scheduler)
+    monkeypatch.setattr("scriptflow.runners.CANCEL_WAIT", 0)
 
     async def flow():
         await asyncio.gather(Task(cmd="first", controller=controller),
