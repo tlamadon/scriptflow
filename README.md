@@ -115,6 +115,8 @@ Resource configuration via chaining:
 task.set_cpu(4)       # CPUs per task (--cpus-per-task)
 task.set_memory(16)   # memory in GB per CPU (--mem-per-cpu)
 task.set_retry(2)     # retry count on failure
+task.set_walltime("00:10:00")  # wall clock limit for this task (default: the executor's)
+task.set_partition("highmem")  # Slurm partition for this task (default: the executor's)
 ```
 
 If the output file already exists (and is newer than the inputs), the task is **skipped automatically**.

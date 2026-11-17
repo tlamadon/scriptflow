@@ -247,3 +247,17 @@ def test_duplicate_scheduler_matches_remain_unresolved(tmp_path, monkeypatch):
     assert a["job_id"] is None
     assert a["state"] == "unknown"
     cancel.assert_not_called()
+
+
+def test_task_walltime_and_partition_override_the_executor():
+    slurm = sf.HpcRunner_slurm({
+        'maxsize': 1, 'user': 'u', 'account': 'a', 'partition': 'standard',
+        'modules': '', 'walltime': '01:00:00',
+    })
+    default = slurm.build_script(sf.Task(cmd="x"))
+    assert "--partition=standard" in default and "--time=01:00:00" in default
+    script = slurm.build_script(sf.Task(cmd="x").set_walltime("00:10:00").set_partition("highmem"))
+    assert "--partition=highmem" in script and "--time=00:10:00" in script
+
+    pbs = sf.HpcRunner({'maxsize': 1, 'user': 'u', 'modules': '', 'walltime': '01:00:00'})
+    assert "walltime=00:10:00" in pbs.build_script(sf.Task(cmd="x").set_walltime("00:10:00"))

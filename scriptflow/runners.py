@@ -506,7 +506,7 @@ exit $EXIT_CODE
             mem = task.mem,
             procs = task.ncore,
             modline = modline,
-            walltime = self.walltime,
+            walltime = task.walltime or self.walltime,
             wd = os.getcwd(),
             setup = format_setup(self.setup, task.get_setup()),
             cmd = render_command(task))
@@ -590,9 +590,9 @@ exit $EXIT_CODE
             setup = format_setup(self.setup, task.get_setup()),
             cmd = render_command(task),
             account = self.account,
-            partition = self.partition,
+            partition = task.partition or self.partition,
             modline = modline,
-            walltime = self.walltime)
+            walltime = task.walltime or self.walltime)
 
     def submit_command(self, attempt):
         return ["sbatch", "--export=NONE", "--job-name", attempt["submission_token"]]

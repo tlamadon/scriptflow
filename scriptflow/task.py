@@ -34,6 +34,8 @@ class Task:
     mem="1"
     ncore="1"
     retry=0
+    walltime=None
+    partition=None
 
     """
     Allows to construct the class with several options!
@@ -160,6 +162,16 @@ class Task:
 
     def set_cpu(self, ncore):
         self.ncore = ncore    
+        return self
+
+    def set_walltime(self, walltime):
+        """Wall clock limit for this task; default is the executor's."""
+        self.walltime = walltime
+        return self
+
+    def set_partition(self, partition):
+        """Slurm partition for this task; default is the executor's."""
+        self.partition = partition
         return self
 
     @staticmethod
