@@ -94,7 +94,7 @@ def new_attempt(task, backend):
         "attempt_id": attempt_id, "number": len(task.attempts) + 1,
         "backend": backend, "state": "submitting", "job_id": None,
         "submission_token": "sf-" + attempt_id[:12],
-        "submitted_at": now(), "finished_at": None,
+        "submitted_at": now(), "started_at": None, "finished_at": None,
         "log": str(directory / (attempt_id + ".out")), "error": None,
         "host": socket.gethostname(),
     }
@@ -179,6 +179,9 @@ def settle(attempt, rows, grace=GRACE):
         state, error = "failed", "no scheduler record or exit marker"
 
     attempt.update(state=state, error=error)
+    # first seen running or already finished: the best available start time
+    if state not in ("queued", "unknown") and not attempt.get("started_at"):
+        attempt["started_at"] = now()
     if state not in SETTLED:
         return False
     attempt.update(exit_code=code, finished_at=now())
@@ -274,7 +277,8 @@ class CommandRunner(AbstractRunner):
                 task.attempts[-1].update(state="failed", error=str(e), finished_at=now())
             return False
 
-        attempt.update(state="running", pid=subp.pid, process_identity=process_identity(subp.pid))
+        attempt.update(state="running", started_at=now(), pid=subp.pid,
+                       process_identity=process_identity(subp.pid))
         self.processes[attempt["attempt_id"]] = {
             "proc" : subp, 
             "task": task , 

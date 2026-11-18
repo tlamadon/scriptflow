@@ -220,6 +220,7 @@ def test_reappearing_job_restarts_grace(tmp_path):
     a = attempt(tmp_path)
     assert not settle(a, [])
     assert not settle(a, [("123", "sf-token", "running")])
+    assert a["started_at"]
     assert "absent_since" not in a
     assert a["state"] == "running"
 
@@ -261,3 +262,14 @@ def test_task_walltime_and_partition_override_the_executor():
 
     pbs = sf.HpcRunner({'maxsize': 1, 'user': 'u', 'modules': '', 'walltime': '01:00:00'})
     assert "walltime=00:10:00" in pbs.build_script(sf.Task(cmd="x").set_walltime("00:10:00"))
+
+
+def test_record_carries_requested_resources():
+    from scriptflow.records import RunRecord, read_record
+    record = RunRecord("test", "resources")
+    task = sf.Task(cmd="x", name="t").set_cpu(4).set_memory(8).set_walltime("1:00:00")
+    record.task(task)
+    record.save()
+    record.close()
+    saved = read_record(record.path)["tasks"][task.execution_id]
+    assert (saved["cpus"], saved["memory"], saved["walltime"], saved["partition"]) == (4, 8.0, "1:00:00", None)

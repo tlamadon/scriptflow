@@ -9,9 +9,11 @@
     run.json holds the run (run_id, flow, working_directory, host, controller_pid,
     state, created_at, updated_at, heartbeat, finished_at, error, cleanup_pending)
     and `tasks`, keyed by task id. Each task has name, command, state, outputs,
-    error and its `attempts`, one per submission: attempt_id, number, backend,
-    state, job_id (or pid and process_identity for local), submission_token,
-    submitted_at, finished_at, log, error, host.
+    error, the requested resources (cpus, memory in GB per CPU, walltime,
+    partition; null where the executor's default applies) and its `attempts`,
+    one per submission: attempt_id, number, backend, state, job_id (or pid and
+    process_identity for local), submission_token, submitted_at, started_at,
+    finished_at, log, error, host.
 
     Run states: running, completed, failed, cancelled, interrupted.
     Task and attempt states add: pending, submitting, queued, unknown, skipped,
@@ -149,6 +151,10 @@ class RunRecord:
             "state": task.state,
             "outputs": [str(Path(p).resolve()) for p in task.get_outputs()],
             "error": task.props.get("error"),
+            "cpus": int(task.ncore),
+            "memory": float(task.mem),
+            "walltime": task.walltime,
+            "partition": task.partition,
             "attempts": task.attempts,
         }
         self.dirty = True
