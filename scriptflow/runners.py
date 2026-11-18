@@ -65,7 +65,6 @@ def format_setup(*setups):
 COMMAND_TIMEOUT = 10   # seconds, for any scheduler command
 GRACE = 300            # seconds a job may be missing from the scheduler before it is failed
 OUTPUT_WAIT = 120      # seconds a finished job's outputs may take to appear on this host
-CANCEL_WAIT = 30       # seconds a cancelling controller waits for the scheduler to confirm
 SETTLED = {"completed", "failed", "cancelled", "interrupted"}
 CANCEL = {"slurm": "scancel", "pbs": "qdel"}
 SLURM_FAILED = {"FAILED", "TIMEOUT", "OUT_OF_MEMORY", "NODE_FAIL", "PREEMPTED",
@@ -428,15 +427,7 @@ class SchedulerRunner(AbstractRunner):
         """Cancel active jobs; True while any lacks terminal evidence."""
         rows, _ = self.poll()
         attempts = [p["attempt"] for p in self.processes.values()]
-        live = cancel_attempts(self.backend, attempts, rows, self.grace)
-
-        # give the scheduler CANCEL_WAIT seconds to confirm the jobs are gone
-        deadline = time.time() + CANCEL_WAIT
-        while live and time.time() < deadline:
-            time.sleep(2)
-            rows, _ = self.poll()
-            if rows is not None:
-                live = [a for a in live if not settle(a, rows, self.grace)]
+        cancel_attempts(self.backend, attempts, rows, self.grace)
         for (k, p) in list(self.processes.items()):
             if p["attempt"]["state"] in SETTLED:
                 del self.processes[k]

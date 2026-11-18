@@ -27,6 +27,9 @@ from .glob import *
 
 console = Console()
 
+CANCEL_WAIT = 30   # seconds a stopping controller waits for the scheduler to confirm
+CANCEL_POLL = 2    # seconds between cancellation passes
+
 # print(toml.load("jmp.toml"))
 
 # with open('jmp.toml', 'w') as f:
@@ -304,13 +307,22 @@ class Controller:
     """
     async def stop(self):
         self.shut_me_down = True
-        unresolved = False
-        for exec in self.executors.values():
-            try:
-                unresolved = bool(exec.cancel()) or unresolved
-            except Exception:
-                self.logger.exception("executor cleanup failed")
-                unresolved = True
+        # repeat the cancellation pass until the scheduler confirms, with the
+        # heartbeat kept alive in between
+        deadline = time.monotonic() + CANCEL_WAIT
+        while True:
+            unresolved = False
+            for exec in self.executors.values():
+                try:
+                    unresolved = bool(exec.cancel()) or unresolved
+                except Exception:
+                    self.logger.exception("executor cleanup failed")
+                    unresolved = True
+            if not unresolved or time.monotonic() >= deadline:
+                break
+            if self.record is not None:
+                self.sync_record()
+            await asyncio.sleep(CANCEL_POLL)
         for task in self.tasks.values():
             if not task.fut.done():
                 task.fut.cancel()

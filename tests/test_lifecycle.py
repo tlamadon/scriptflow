@@ -239,9 +239,15 @@ async def test_cancel_waits_for_scheduler_confirmation(monkeypatch):
         return f"123|{token}|{state}\n".encode()
 
     monkeypatch.setattr(subprocess, "check_output", scheduler)
-    monkeypatch.setattr(time, "sleep", lambda seconds: None)
+    monkeypatch.setattr("scriptflow.core.CANCEL_POLL", 0)
+    controller.start_record("test", "cancel-wait")
+    beats = Mock(side_effect=controller.record.heartbeat)
+    monkeypatch.setattr(controller.record, "heartbeat", beats)
+    controller.heartbeat_at = 0
     controller.update()
     assert not await controller.stop()
+    assert beats.call_count >= 1
+    controller.record.close()
     assert task.attempts[-1]["state"] == "cancelled"
     assert runner.size() == 0
 
@@ -266,7 +272,7 @@ async def test_scheduler_cleanup_remains_pending_until_confirmed(monkeypatch):
     monkeypatch.setattr(subprocess, "check_output", scheduler)
     controller.update()
     token = task.attempts[-1]["submission_token"]
-    monkeypatch.setattr("scriptflow.runners.CANCEL_WAIT", 0)
+    monkeypatch.setattr("scriptflow.core.CANCEL_WAIT", 0)
     assert await controller.stop()
     controller.record.finish("cancelled", cleanup_pending=True)
     controller.record.close()
@@ -416,7 +422,7 @@ async def test_cancel_during_submission_preserves_accepted_job(monkeypatch):
         raise AssertionError(argv)
 
     monkeypatch.setattr(subprocess, "check_output", scheduler)
-    monkeypatch.setattr("scriptflow.runners.CANCEL_WAIT", 0)
+    monkeypatch.setattr("scriptflow.core.CANCEL_WAIT", 0)
 
     async def flow():
         await asyncio.gather(Task(cmd="first", controller=controller),
