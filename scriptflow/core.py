@@ -1,21 +1,16 @@
 # simple script flow
 
-import subprocess
 import os
 import time
 #import toml
 import asyncio
-import tempfile
 from datetime import datetime
-import asyncio
 import logging
 import queue
 
-import shlex
 import fnmatch
 
 from rich.console import Console
-from time import sleep
 from os.path import exists
 
 from omegaconf import OmegaConf
@@ -27,6 +22,7 @@ from .glob import *
 
 console = Console()
 
+HEARTBEAT = 2      # seconds between heartbeats in the run record
 CANCEL_WAIT = 30   # seconds a stopping controller waits for the scheduler to confirm
 CANCEL_POLL = 2    # seconds between cancellation passes
 
@@ -53,7 +49,6 @@ def bag(*args, **kwargs):
     return(asyncio.gather(*args, **kwargs))
 
 from rich.console import Console
-from time import sleep
 
 class FileSystem:
 
@@ -84,7 +79,6 @@ class Controller:
         self.force_string = conf.get('force',None)
 
         self.shut_me_down = False
-        self.loop = None
 
         self.msg_queue = queue.Queue()
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -112,7 +106,7 @@ class Controller:
             if flush:
                 self.record.save()
 
-    # pending changes are written once per tick, the heartbeat every 2s;
+    # pending changes are written once per tick, the heartbeat every HEARTBEAT seconds;
     # a failed write is retried at the next heartbeat
     def sync_record(self):
         beat = time.monotonic() >= self.heartbeat_at
@@ -126,7 +120,7 @@ class Controller:
             self.record_failed = True
             self.logger.warning("run record not written: %s", e)
         if beat:
-            self.heartbeat_at = time.monotonic() + 2
+            self.heartbeat_at = time.monotonic() + HEARTBEAT
 
     """
     The user tells us that a task should be added
@@ -333,15 +327,6 @@ class Controller:
                 task.state = "cancelled"
             self.record_task(task)
         return unresolved
-
-    async def update_loop(self):
-        while self.shut_me_down==False:
-            self.update()
-            await asyncio.sleep(0.1)
-
-    async def shutdown(self):
-        self.shut_me_down = True
-        await self.loop
 
     def log(self, str):
         self.msg_queue.put(str)

@@ -11,7 +11,6 @@ from abc import ABC, abstractmethod
 
 import asyncio
 import logging
-import queue
 import re
 import subprocess
 from datetime import datetime
@@ -24,7 +23,7 @@ import time
 import uuid
 
 from .container import render_command
-from .records import now
+from .records import TERMINAL, now
 
 def exit_code_from_log(log_path):
     """Return the job's exit code by reading the `Exit Code: N` line the job script
@@ -65,7 +64,6 @@ def format_setup(*setups):
 COMMAND_TIMEOUT = 10   # seconds, for any scheduler command
 GRACE = 300            # seconds a job may be missing from the scheduler before it is failed
 OUTPUT_WAIT = 120      # seconds a finished job's outputs may take to appear on this host
-SETTLED = {"completed", "failed", "cancelled", "interrupted"}
 CANCEL = {"slurm": "scancel", "pbs": "qdel"}
 SLURM_FAILED = {"FAILED", "TIMEOUT", "OUT_OF_MEMORY", "NODE_FAIL", "PREEMPTED",
                 "BOOT_FAIL", "DEADLINE", "REVOKED"}
@@ -154,7 +152,7 @@ def settle(attempt, rows, grace=GRACE):
     the `Exit Code` line of its log. A job absent without that line is failed after
     `grace` seconds.
     """
-    if attempt["state"] in SETTLED:
+    if attempt["state"] in TERMINAL:
         return True
     if attempt["job_id"]:
         found = [r for r in rows if r[0] == attempt["job_id"]]
@@ -182,7 +180,7 @@ def settle(attempt, rows, grace=GRACE):
     # first seen running or already finished: the best available start time
     if state not in ("queued", "unknown") and not attempt.get("started_at"):
         attempt["started_at"] = now()
-    if state not in SETTLED:
+    if state not in TERMINAL:
         return False
     attempt.update(exit_code=code, finished_at=now())
     return True
@@ -194,7 +192,7 @@ def cancel_attempts(backend, attempts, rows, grace=GRACE):
     Returns the attempts still lacking terminal evidence.
     """
     if rows is None:
-        live = [a for a in attempts if a["state"] not in SETTLED]
+        live = [a for a in attempts if a["state"] not in TERMINAL]
     else:
         live = [a for a in attempts if not settle(a, rows, grace)]
     known = [a for a in live if a["job_id"]]
@@ -212,7 +210,7 @@ def cancel_attempts(backend, attempts, rows, grace=GRACE):
 
 def cancel_local(attempt):
     """Terminate a local attempt left by a dead controller; True once its process is gone."""
-    if attempt["state"] in SETTLED:
+    if attempt["state"] in TERMINAL:
         return True
     pid = attempt.get("pid")
     if not pid or attempt["host"] != socket.gethostname():
@@ -266,6 +264,7 @@ class CommandRunner(AbstractRunner):
         setup = format_setup(self.setup, task.get_setup())
         inner = setup + "\n" + line if setup else line
         command = ["bash", "-c", inner]
+        attempt = None
         try:
             attempt = new_attempt(task, "local")
             with open(attempt["log"], "wb") as log:
@@ -273,8 +272,8 @@ class CommandRunner(AbstractRunner):
                     stderr=subprocess.STDOUT, start_new_session=True)
         except OSError as e:
             logging.error("failed to start task %s: %s", task.uid, e)
-            if task.attempts:
-                task.attempts[-1].update(state="failed", error=str(e), finished_at=now())
+            if attempt is not None:
+                attempt.update(state="failed", error=str(e), finished_at=now())
             return False
 
         attempt.update(state="running", started_at=now(), pid=subp.pid,
@@ -433,7 +432,7 @@ class SchedulerRunner(AbstractRunner):
         attempts = [p["attempt"] for p in self.processes.values()]
         cancel_attempts(self.backend, attempts, rows, self.grace)
         for (k, p) in list(self.processes.items()):
-            if p["attempt"]["state"] in SETTLED:
+            if p["attempt"]["state"] in TERMINAL:
                 del self.processes[k]
             p["job"].report(p["attempt"]["state"])
         return bool(self.processes)
@@ -447,7 +446,6 @@ class HpcRunner(SchedulerRunner):
     script_template = """\
 #!/bin/bash
 
-#PBS -N {name}
 #PBS -j oe
 #PBS -l procs={procs},mem={mem}gb
 #PBS -l walltime={walltime}
@@ -473,17 +471,12 @@ exit $EXIT_CODE
     def __init__(self, conf):
         conf = OmegaConf.create(conf)
         self.max_proc = conf.maxsize
-        self.user = conf.user
         self.modules = conf.modules
         self.walltime = conf.walltime
         self.setup = conf.get('setup', [])
         self.grace = conf.get('grace', GRACE)
         self.output_wait = conf.get('output_wait', OUTPUT_WAIT)
         self.processes = {}
-
-        # create log-directory
-        if not os.path.exists("log"):
-            os.mkdir("log")
 
     def size(self):
         return(len(self.processes))
@@ -497,7 +490,6 @@ exit $EXIT_CODE
         # `module load`.
         modline = f"module load {self.modules}\n" if self.modules else ""
         return self.script_template.format(
-            name = "sf-{}".format(task.uid),
             mem = task.mem,
             procs = task.ncore,
             modline = modline,
@@ -525,7 +517,6 @@ class HpcRunner_slurm(SchedulerRunner):
 #SBATCH --mem-per-cpu={mem}G
 #SBATCH --cpus-per-task={ncore} 
 #SBATCH --time={walltime} # wall clock limit (d-hh:mm:ss)
-#SBATCH --job-name={name} # user-defined job name
 
 # Print job info
 echo "Job ID: $SLURM_JOB_ID"
@@ -562,10 +553,6 @@ exit $EXIT_CODE
         self.grace = conf.get('grace', GRACE)
         self.output_wait = conf.get('output_wait', OUTPUT_WAIT)
 
-        # create log-directory
-        if not os.path.exists("log"):
-            os.mkdir("log")
-
     def size(self):
         return(len(self.processes))
 
@@ -578,7 +565,6 @@ exit $EXIT_CODE
         # `module load`.
         modline = f"module load {self.modules}\n" if self.modules else ""
         return self.script_template.format(
-            name = "{}".format(task.uid),
             mem = task.mem,
             ncore = task.ncore,
             wd = os.getcwd(),

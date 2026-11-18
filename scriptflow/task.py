@@ -1,5 +1,4 @@
 
-import hashlib
 import asyncio
 import shlex
 import uuid
@@ -122,7 +121,6 @@ class Task:
         else:
             self.setup = []
 
-        self.hash = ""
         self.return_file = ""
 
         if "props" in kwargs.keys():
@@ -140,7 +138,6 @@ class Task:
     def schedule(self):
         self.fut = asyncio.get_event_loop().create_future()
         self.state = "scheduled"
-        self.hash = hashlib.md5("".join(self.get_command()).encode()).hexdigest()
         self.controller.add(self)
         return(self)
 

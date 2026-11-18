@@ -33,6 +33,7 @@ from pathlib import Path
 
 SCHEMA_VERSION = 1
 TERMINAL = {"completed", "failed", "cancelled", "interrupted"}
+STALE_AFTER = 30   # seconds without a heartbeat before a running record reads as stale
 
 
 def now():
@@ -76,7 +77,7 @@ def read_record(path):
     return data
 
 
-def inspect_record(path, stale_after=30):
+def inspect_record(path, stale_after=STALE_AFTER):
     """The record plus `observation`: heartbeat age, staleness, pending cancel request.
 
     A stale heartbeat means the controller may be gone, not that the run ended.

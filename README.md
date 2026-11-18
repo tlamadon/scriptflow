@@ -242,8 +242,7 @@ scriptflow run analysis
 ```
 
 Detach with Ctrl+B, then D; reattach to that session on the same compute node with
-`tmux attach`. ScriptFlow runs independently of ScriptHut. Its Slurm/PBS executors
-continue submitting separate task jobs. tmux preserves the session across terminal
+`tmux attach`. The Slurm/PBS executors submit separate task jobs. tmux preserves the session across terminal
 disconnection, but does not extend the compute allocation's lifetime.
 
 ## Run records

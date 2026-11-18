@@ -3,12 +3,9 @@
 
 """
 
-import omegaconf
 import pytest
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 import scriptflow as sf
-import asyncio
-import pytest_asyncio
 import subprocess
 import time
 from pathlib import Path
@@ -186,28 +183,23 @@ def test_slurm_setup_injected(monkeypatch):
     assert "--export=NONE" in captured['cmd']
 
 
-def attempt(tmp_path, **fields):
-    return dict(dict(state="queued", backend="slurm", job_id="123", submission_token="sf-token",
-                     log=str(tmp_path / "attempt.out"), error=None), **fields)
-
-
-def test_exit_marker_settles_absent_job(tmp_path):
+def test_exit_marker_settles_absent_job(tmp_path, attempt):
     for code, state in ((0, "completed"), (3, "failed")):
-        a = attempt(tmp_path)
+        a = attempt()
         Path(a["log"]).write_text(f"Exit Code: {code}\n")
         assert settle(a, [])
         assert (a["state"], a["exit_code"]) == (state, code)
 
 
-def test_quick_job_with_lost_acknowledgement(tmp_path):
-    a = attempt(tmp_path, state="unknown", job_id=None)
+def test_quick_job_with_lost_acknowledgement(tmp_path, attempt):
+    a = attempt(state="unknown", job_id=None)
     Path(a["log"]).write_text("Exit Code: 0\n")
     assert settle(a, [])
     assert a["state"] == "completed"
 
 
-def test_absent_job_fails_after_grace(tmp_path, monkeypatch):
-    a = attempt(tmp_path)
+def test_absent_job_fails_after_grace(tmp_path, monkeypatch, attempt):
+    a = attempt()
     assert not settle(a, [], grace=300)
     assert a["state"] == "queued"
     monkeypatch.setattr(time, "time", lambda: a["absent_since"] + 301)
@@ -216,8 +208,8 @@ def test_absent_job_fails_after_grace(tmp_path, monkeypatch):
     assert "no scheduler record" in a["error"]
 
 
-def test_reappearing_job_restarts_grace(tmp_path):
-    a = attempt(tmp_path)
+def test_reappearing_job_restarts_grace(tmp_path, attempt):
+    a = attempt()
     assert not settle(a, [])
     assert not settle(a, [("123", "sf-token", "running")])
     assert a["started_at"]
@@ -225,8 +217,8 @@ def test_reappearing_job_restarts_grace(tmp_path):
     assert a["state"] == "running"
 
 
-def test_lost_acknowledgement_reconciles_by_name(tmp_path):
-    a = attempt(tmp_path, state="unknown", job_id=None)
+def test_lost_acknowledgement_reconciles_by_name(tmp_path, attempt):
+    a = attempt(state="unknown", job_id=None)
     assert not settle(a, [("7", "other", "running"), ("123", "sf-token", "queued")])
     assert (a["job_id"], a["state"]) == ("123", "queued")
 
@@ -239,8 +231,8 @@ def test_pbs_rows(monkeypatch):
     assert pbs_rows() == [("1.server", "sf-a", "running"), ("2.server", "sf-b", "failed")]
 
 
-def test_duplicate_scheduler_matches_remain_unresolved(tmp_path, monkeypatch):
-    a = attempt(tmp_path, state="unknown", job_id=None)
+def test_duplicate_scheduler_matches_remain_unresolved(tmp_path, monkeypatch, attempt):
+    a = attempt(state="unknown", job_id=None)
     cancel = Mock()
     monkeypatch.setattr(subprocess, "check_output", cancel)
     rows = [("123", "sf-token", "running"), ("124", "sf-token", "running")]

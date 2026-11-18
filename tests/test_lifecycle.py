@@ -381,14 +381,9 @@ async def test_rejected_submission_fails_without_retry(monkeypatch):
     assert call.call_count == 1
 
 
-def attempt(tmp_path, **fields):
-    return dict(dict(state="queued", backend="slurm", job_id="123", submission_token="sf-token",
-                     log=str(tmp_path / "attempt.out"), error=None), **fields)
-
-
-def test_cleanup_keeps_terminal_task_states(tmp_path):
+def test_cleanup_keeps_terminal_task_states(tmp_path, attempt):
     record = RunRecord("test", "states")
-    done = dict(attempt(tmp_path, state="completed"), backend="slurm")
+    done = attempt(state="completed")
     record.data["tasks"] = {
         "a": dict(state="completed", attempts=[done]),
         "b": dict(state="pending", attempts=[]),

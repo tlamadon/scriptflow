@@ -1,7 +1,6 @@
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
 import scriptflow as sf
-from omegaconf import OmegaConf
 from scriptflow.core import Controller
 import pytest
 

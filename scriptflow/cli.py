@@ -16,7 +16,7 @@ import subprocess
 from .glob import get_main_controller
 from .records import (TERMINAL, atomic_json, inspect_record, now, read_record,
                       request_cancel, run_path)
-from .runners import SETTLED, cancel_attempts, cancel_local, pbs_rows, slurm_rows
+from .runners import cancel_attempts, cancel_local, pbs_rows, slurm_rows
 
 # loading the local sflow.py file
 def load_local_file(filename):
@@ -93,7 +93,7 @@ def cli():
 @click.option('-f', '--force', 'force')
 @click.option('--run-id', help='Identity of this launch; an existing one is rejected.')
 @click.option('--runs-dir', default='.sf/runs', show_default=True, type=click.Path())
-def run(name="",force=None,run_id=None,runs_dir=".sf/runs",load="sflow.py"):
+def run(name="",force=None,run_id=None,runs_dir=".sf/runs"):
 
     # an existing run is rejected before the flow file is imported
     if run_id is not None:
@@ -197,7 +197,7 @@ def cleanup_attempts(data):
     attempts = [a for t in data["tasks"].values() for a in t["attempts"]]
     live = [a for a in attempts if a["backend"] == "local" and not cancel_local(a)]
     for backend in ("slurm", "pbs"):
-        mine = [a for a in attempts if a["backend"] == backend and a["state"] not in SETTLED]
+        mine = [a for a in attempts if a["backend"] == backend and a["state"] not in TERMINAL]
         if mine:
             try:
                 rows = slurm_rows(getpass.getuser()) if backend == "slurm" else pbs_rows()

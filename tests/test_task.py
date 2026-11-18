@@ -4,21 +4,12 @@
 """
 
 import pytest
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 import scriptflow as sf
-import asyncio
-import pytest_asyncio
 
-@pytest_asyncio.fixture
-async def controller():
-
-    runner = Mock(**{
-        'available_slots.return_value' : 1})
-
-    controller:sf.code.Controller = sf.core.Controller(runner=runner)
-    controller.loop = asyncio.get_running_loop().create_task(controller.update_loop(), name="controller")
-    yield controller 
-    await controller.shutdown()   
+@pytest.fixture
+def controller():
+    return sf.core.Controller(runner=Mock(**{'available_slots.return_value' : 1}))
 
 @pytest.mark.asyncio
 async def test_tasks(controller):
